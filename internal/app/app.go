@@ -2,8 +2,10 @@ package app
 
 import (
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/gitsang/logi"
 	"github.com/gitsang/opencode-connect/internal/chat"
@@ -16,6 +18,7 @@ func NewLogger(cfg *config.Config) *slog.Logger {
 		Color:     cfg.Log.Color,
 		Level:     cfg.Log.Level,
 		Verbosity: cfg.Log.Verbosity,
+		Writers:   []io.Writer{os.Stdout},
 		Attrs: map[string]interface{}{
 			"service": "opencode-connect",
 		},

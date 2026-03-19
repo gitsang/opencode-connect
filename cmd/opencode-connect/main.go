@@ -35,13 +35,18 @@ func newRootCmd() *cobra.Command {
 
 			logger := app.NewLogger(cfg)
 			slog.SetDefault(logger)
+			logger.Error("preparing...", slog.Any("cfg", cfg))
 
 			opencodeClient, err := opencode.NewClient(cfg)
 			if err != nil {
 				return err
 			}
 
-			plugins, err := plugin.BuildEnabledPlugins(logger, opencodeClient, cfg)
+			plugins, err := plugin.BuildEnabledPlugins(plugin.Dependencies{
+				Logger:         logger,
+				OpencodeClient: opencodeClient,
+				Config:         cfg,
+			})
 			if err != nil {
 				return err
 			}

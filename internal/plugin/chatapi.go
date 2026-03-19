@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"time"
+	"sync"
 
 	"github.com/gitsang/opencode-connect/internal/app"
 	corechatapi "github.com/gitsang/opencode-connect/internal/chatapi"
@@ -15,16 +15,27 @@ import (
 )
 
 type ChatAPI struct {
-	logger         *slog.Logger
-	opencodeClient *opencode.Client
-	cfg            *config.Config
+	logger   *slog.Logger
+	cfg      *config.Config
+	server   *http.Server
+	stopOnce sync.Once
 }
 
 func NewChatAPI(logger *slog.Logger, opencodeClient *opencode.Client, cfg *config.Config) *ChatAPI {
+	sessionStore := session.NewMemoryStore()
+	chatApp := corechatapi.NewChatAPI(opencodeClient, sessionStore, cfg)
+	serverConfig := cfg.Plugins.ChatAPI
+
 	return &ChatAPI{
-		logger:         logger,
-		opencodeClient: opencodeClient,
-		cfg:            cfg,
+		logger: logger,
+		cfg:    cfg,
+		server: &http.Server{
+			Addr:         serverConfig.Listen,
+			Handler:      app.NewHTTPHandler(chatApp),
+			ReadTimeout:  serverConfig.ReadTimeout,
+			WriteTimeout: serverConfig.WriteTimeout,
+			IdleTimeout:  serverConfig.IdleTimeout,
+		},
 	}
 }
 
@@ -32,45 +43,37 @@ func (p *ChatAPI) Name() string {
 	return "chatapi"
 }
 
-func (p *ChatAPI) Run(ctx context.Context) error {
-	sessionStore := session.NewMemoryStore()
-	chatApp := corechatapi.NewChatAPI(p.opencodeClient, sessionStore, p.cfg)
-
+func (p *ChatAPI) Start(ctx context.Context) error {
 	serverConfig := p.cfg.Plugins.ChatAPI
-	httpServer := &http.Server{
-		Addr:         serverConfig.Listen,
-		Handler:      app.NewHTTPHandler(chatApp),
-		ReadTimeout:  serverConfig.ReadTimeout,
-		WriteTimeout: serverConfig.WriteTimeout,
-		IdleTimeout:  serverConfig.IdleTimeout,
-	}
 
 	errCh := make(chan error, 1)
 	go func() {
 		p.logger.Info("chatapi plugin started", "listen", serverConfig.Listen)
-		errCh <- httpServer.ListenAndServe()
+		errCh <- p.server.ListenAndServe()
 	}()
 
 	select {
 	case <-ctx.Done():
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-
-		if err := httpServer.Shutdown(shutdownCtx); err != nil {
-			return fmt.Errorf("shutdown http server: %w", err)
-		}
-
-		err := <-errCh
-		if err != nil && err != http.ErrServerClosed {
-			return fmt.Errorf("http server stopped with error: %w", err)
-		}
-
-		p.logger.Info("chatapi plugin stopped")
 		return nil
 	case err := <-errCh:
 		if err == nil || err == http.ErrServerClosed {
+			p.logger.Info("chatapi plugin stopped")
 			return nil
 		}
-		return err
+		return fmt.Errorf("listen chatapi http server: %w", err)
 	}
+}
+
+func (p *ChatAPI) Stop(ctx context.Context) error {
+	var stopErr error
+	p.stopOnce.Do(func() {
+		if err := p.server.Shutdown(ctx); err != nil && err != http.ErrServerClosed {
+			stopErr = fmt.Errorf("shutdown http server: %w", err)
+			return
+		}
+
+		p.logger.Info("chatapi plugin stopped")
+	})
+
+	return stopErr
 }

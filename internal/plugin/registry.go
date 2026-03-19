@@ -2,48 +2,53 @@ package plugin
 
 import (
 	"fmt"
-	"log/slog"
 
 	"github.com/gitsang/opencode-connect/internal/config"
-	"github.com/gitsang/opencode-connect/internal/opencode"
 )
 
-type Factory func(logger *slog.Logger, opencodeClient *opencode.Client, cfg *config.Config) (Plugin, error)
+func BuildEnabledPlugins(deps Dependencies) ([]Plugin, error) {
+	if deps.Logger == nil {
+		return nil, fmt.Errorf("plugin dependencies.logger is required")
+	}
+	if deps.OpencodeClient == nil {
+		return nil, fmt.Errorf("plugin dependencies.opencode_client is required")
+	}
+	if deps.Config == nil {
+		return nil, fmt.Errorf("plugin dependencies.config is required")
+	}
 
-func BuildEnabledPlugins(logger *slog.Logger, opencodeClient *opencode.Client, cfg *config.Config) ([]Plugin, error) {
-	factories := map[string]Factory{
-		"chatapi": func(logger *slog.Logger, opencodeClient *opencode.Client, cfg *config.Config) (Plugin, error) {
-			return NewChatAPI(logger, opencodeClient, cfg), nil
+	registrations := []Registration{
+		{
+			Key:     "chatapi",
+			Enabled: func(cfg *config.Config) bool { return cfg.Plugins.ChatAPI.Enabled },
+			Build: func(deps Dependencies) (Plugin, error) {
+				return NewChatAPI(deps.Logger, deps.OpencodeClient, deps.Config), nil
+			},
 		},
-		"ume":        unsupportedFactory("UME"),
-		"mattermost": unsupportedFactory("Mattermost"),
+		{
+			Key:     "ume",
+			Enabled: func(cfg *config.Config) bool { return cfg.Plugins.UME.Enabled },
+			Build:   unsupportedFactory("UME"),
+		},
+		{
+			Key:     "mattermost",
+			Enabled: func(cfg *config.Config) bool { return cfg.Plugins.Mattermost.Enabled },
+			Build:   unsupportedFactory("Mattermost"),
+		},
 	}
 
-	enabled := map[string]bool{
-		"chatapi":    cfg.Plugins.ChatAPI.Enabled,
-		"ume":        cfg.Plugins.UME.Enabled,
-		"mattermost": cfg.Plugins.Mattermost.Enabled,
-	}
-
-	pluginOrder := []string{"chatapi", "ume", "mattermost"}
-	plugins := make([]Plugin, 0, len(enabled))
-	for _, name := range pluginOrder {
-		isEnabled := enabled[name]
-		if !isEnabled {
+	plugins := make([]Plugin, 0, len(registrations))
+	for _, registration := range registrations {
+		if !registration.Enabled(deps.Config) {
 			continue
 		}
 
-		factory, ok := factories[name]
-		if !ok {
-			return nil, fmt.Errorf("plugin factory not found: %s", name)
-		}
-
-		plugin, err := factory(logger, opencodeClient, cfg)
+		plugin, err := registration.Build(deps)
 		if err != nil {
-			return nil, fmt.Errorf("build %s plugin: %w", name, err)
+			return nil, fmt.Errorf("build %s plugin: %w", registration.Key, err)
 		}
 		if plugin == nil {
-			return nil, fmt.Errorf("build %s plugin: factory returned nil plugin", name)
+			return nil, fmt.Errorf("build %s plugin: factory returned nil plugin", registration.Key)
 		}
 
 		plugins = append(plugins, plugin)
@@ -53,7 +58,7 @@ func BuildEnabledPlugins(logger *slog.Logger, opencodeClient *opencode.Client, c
 }
 
 func unsupportedFactory(pluginName string) Factory {
-	return func(_ *slog.Logger, _ *opencode.Client, _ *config.Config) (Plugin, error) {
+	return func(_ Dependencies) (Plugin, error) {
 		return nil, fmt.Errorf("%s plugin is not implemented", pluginName)
 	}
 }
