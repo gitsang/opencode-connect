@@ -15,36 +15,14 @@ import (
 type OpencodeConnect struct {
 	opencodeClient *opencode.Client
 	sessionStore   session.Store
-	defaultDir     string
 	resolveMu      sync.Mutex
 }
 
-type Option func(*OpencodeConnect)
-
-func WithDefaultDirectory(directory string) Option {
-	return func(conn *OpencodeConnect) {
-		conn.defaultDir = strings.TrimSpace(directory)
-	}
-}
-
-func New(opencodeClient *opencode.Client, sessionStore session.Store, opts ...Option) *OpencodeConnect {
-	conn := &OpencodeConnect{
+func New(opencodeClient *opencode.Client, sessionStore session.Store) *OpencodeConnect {
+	return &OpencodeConnect{
 		opencodeClient: opencodeClient,
 		sessionStore:   sessionStore,
 	}
-
-	for _, applyOption := range opts {
-		if applyOption == nil {
-			continue
-		}
-		applyOption(conn)
-	}
-
-	if conn.defaultDir == "" {
-		conn.defaultDir = "."
-	}
-
-	return conn
 }
 
 func (c *OpencodeConnect) Handle(ctx context.Context, req *Message) (*Message, error) {
@@ -113,7 +91,7 @@ func (c *OpencodeConnect) resolveOpencodeSessionID(ctx context.Context, chatSess
 		return opencodeSessionID, nil
 	}
 
-	created, err := c.opencodeClient.CreateSession(ctx, c.opencodeClient.NewSessionTitle(chatSessionID))
+	created, err := c.opencodeClient.CreateSession(ctx, chatSessionID)
 	if err != nil {
 		return "", err
 	}
@@ -129,14 +107,14 @@ func (c *OpencodeConnect) listSessions(ctx context.Context) (string, error) {
 	}
 
 	if len(sessions) == 0 {
-		return "- " + c.defaultDir, nil
+		return "- (no sessions)", nil
 	}
 
 	byDirectory := map[string][]string{}
 	for _, currentSession := range sessions {
-		directory := currentSession.Directory
-		if strings.TrimSpace(directory) == "" {
-			directory = c.defaultDir
+		directory := strings.TrimSpace(currentSession.Directory)
+		if directory == "" {
+			directory = "."
 		}
 
 		title := strings.TrimSpace(currentSession.Title)

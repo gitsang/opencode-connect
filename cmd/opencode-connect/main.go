@@ -13,6 +13,8 @@ import (
 	"github.com/gitsang/opencode-connect/internal/opencode"
 	"github.com/gitsang/opencode-connect/internal/plugin"
 	"github.com/gitsang/opencode-connect/internal/session"
+	ocsdk "github.com/sst/opencode-sdk-go"
+	"github.com/sst/opencode-sdk-go/option"
 	"github.com/spf13/cobra"
 )
 
@@ -70,26 +72,31 @@ func Run(cmd *cobra.Command, _ []string) error {
 		slog.String("pid", fmt.Sprintf("%d", os.Getpid())),
 	)
 
-	opencodeClient, err := opencode.NewClient(
-		opencode.WithBaseURL(c.Opencode.BaseURL),
-		opencode.WithPassword(c.Opencode.Password),
-		opencode.WithPasswordHeader(c.Opencode.PasswordHeader),
-		opencode.WithPasswordScheme(c.Opencode.PasswordScheme),
-		opencode.WithDirectory(c.Opencode.Directory),
-		opencode.WithPromptTimeout(c.Opencode.PromptTimeout),
-		opencode.WithDefaultModel(c.Opencode.DefaultProvider, c.Opencode.DefaultModel),
-		opencode.WithModelAliases(c.Opencode.ModelAliases),
-		opencode.WithSessionTitleTemplate(c.Opencode.SessionTitleTpl),
-		opencode.WithExtraHeaders(c.Opencode.ExtraHeaders),
-	)
-	if err != nil {
-		return err
+	sdkOpts := []option.RequestOption{
+		option.WithBaseURL(c.Opencode.BaseURL),
 	}
+	if c.Opencode.Password != "" {
+		authValue := c.Opencode.Password
+		if c.Opencode.PasswordScheme != "" {
+			authValue = fmt.Sprintf("%s %s", c.Opencode.PasswordScheme, c.Opencode.Password)
+		}
+		sdkOpts = append(sdkOpts, option.WithHeader(c.Opencode.PasswordHeader, authValue))
+	}
+	for key, value := range c.Opencode.ExtraHeaders {
+		if strVal := fmt.Sprint(value); strVal != "" {
+			sdkOpts = append(sdkOpts, option.WithHeader(key, strVal))
+		}
+	}
+	sdkClient := ocsdk.NewClient(sdkOpts...)
+
+	opencodeClient := opencode.NewClient(sdkClient,
+		opencode.WithPromptTimeout(c.Opencode.PromptTimeout),
+		opencode.WithModelAliases(c.Opencode.ModelAliases),
+	)
 
 	conn := connect.New(
 		opencodeClient,
 		session.NewMemoryStore(),
-		connect.WithDefaultDirectory(c.Opencode.Directory),
 	)
 
 	plugins, err := plugin.BuildEnabledPlugins(plugin.Dependencies{

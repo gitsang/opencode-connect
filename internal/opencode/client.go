@@ -8,65 +8,18 @@ import (
 	"time"
 
 	ocsdk "github.com/sst/opencode-sdk-go"
-	"github.com/sst/opencode-sdk-go/option"
 )
 
 type Option func(*clientConfig)
 
 type clientConfig struct {
-	baseURL         string
-	password        string
-	passwordHeader  string
-	passwordScheme  string
-	directory       string
-	promptTimeout   time.Duration
-	defaultProvider string
-	defaultModel    string
-	modelAliases    map[string]string
-	sessionTitleTpl string
-	extraHeaders    map[string]any
-}
-
-func WithBaseURL(baseURL string) Option {
-	return func(cfg *clientConfig) {
-		cfg.baseURL = strings.TrimSpace(baseURL)
-	}
-}
-
-func WithPassword(password string) Option {
-	return func(cfg *clientConfig) {
-		cfg.password = password
-	}
-}
-
-func WithPasswordHeader(passwordHeader string) Option {
-	return func(cfg *clientConfig) {
-		cfg.passwordHeader = strings.TrimSpace(passwordHeader)
-	}
-}
-
-func WithPasswordScheme(passwordScheme string) Option {
-	return func(cfg *clientConfig) {
-		cfg.passwordScheme = strings.TrimSpace(passwordScheme)
-	}
-}
-
-func WithDirectory(directory string) Option {
-	return func(cfg *clientConfig) {
-		cfg.directory = strings.TrimSpace(directory)
-	}
+	promptTimeout time.Duration
+	modelAliases  map[string]string
 }
 
 func WithPromptTimeout(timeout time.Duration) Option {
 	return func(cfg *clientConfig) {
 		cfg.promptTimeout = timeout
-	}
-}
-
-func WithDefaultModel(providerID string, modelID string) Option {
-	return func(cfg *clientConfig) {
-		cfg.defaultProvider = strings.TrimSpace(providerID)
-		cfg.defaultModel = strings.TrimSpace(modelID)
 	}
 }
 
@@ -78,27 +31,8 @@ func WithModelAliases(aliases map[string]string) Option {
 		}
 
 		copied := make(map[string]string, len(aliases))
-		maps.Copy(aliases, copied)
+		maps.Copy(copied, aliases)
 		cfg.modelAliases = copied
-	}
-}
-
-func WithSessionTitleTemplate(template string) Option {
-	return func(cfg *clientConfig) {
-		cfg.sessionTitleTpl = template
-	}
-}
-
-func WithExtraHeaders(headers map[string]any) Option {
-	return func(cfg *clientConfig) {
-		if headers == nil {
-			cfg.extraHeaders = nil
-			return
-		}
-
-		copied := make(map[string]any, len(headers))
-		maps.Copy(headers, copied)
-		cfg.extraHeaders = copied
 	}
 }
 
@@ -115,21 +49,16 @@ type PromptResult struct {
 }
 
 type Client struct {
-	client          *ocsdk.Client
-	directory       string
-	promptTimeout   time.Duration
-	modelAliases    map[string]string
-	sessionTitleTpl string
-	defaultModel    ModelRef
-	providerLoaded  bool
+	client         *ocsdk.Client
+	promptTimeout  time.Duration
+	modelAliases   map[string]string
+	defaultModel   ModelRef
+	providerLoaded bool
 }
 
-func NewClient(opts ...Option) (*Client, error) {
+func NewClient(sdkClient *ocsdk.Client, opts ...Option) *Client {
 	cfg := clientConfig{
-		passwordHeader: "Authorization",
-		passwordScheme: "Bearer",
-		directory:      ".",
-		promptTimeout:  5 * time.Minute,
+		promptTimeout: 5 * time.Minute,
 	}
 
 	for _, applyOption := range opts {
@@ -139,49 +68,17 @@ func NewClient(opts ...Option) (*Client, error) {
 		applyOption(&cfg)
 	}
 
-	options := []option.RequestOption{
-		option.WithBaseURL(cfg.baseURL),
-	}
-
-	if cfg.password != "" {
-		value := cfg.password
-		if cfg.passwordScheme != "" {
-			value = fmt.Sprintf("%s %s", cfg.passwordScheme, cfg.password)
-		}
-		options = append(options, option.WithHeader(cfg.passwordHeader, value))
-	}
-
-	for key, value := range cfg.extraHeaders {
-		valueString := fmt.Sprint(value)
-		if valueString == "" {
-			continue
-		}
-		options = append(options, option.WithHeader(key, valueString))
-	}
-
-	client := ocsdk.NewClient(options...)
-
 	return &Client{
-		client:          client,
-		directory:       cfg.directory,
-		promptTimeout:   cfg.promptTimeout,
-		modelAliases:    cfg.modelAliases,
-		sessionTitleTpl: cfg.sessionTitleTpl,
-		defaultModel: ModelRef{
-			ProviderID: cfg.defaultProvider,
-			ModelID:    cfg.defaultModel,
-		},
-	}, nil
+		client:        sdkClient,
+		promptTimeout: cfg.promptTimeout,
+		modelAliases:  cfg.modelAliases,
+	}
 }
 
-func (c *Client) CreateSession(ctx context.Context, title string) (*ocsdk.Session, error) {
-	if title == "" {
-		title = "chat-session"
-	}
-
+func (c *Client) CreateSession(ctx context.Context, chatSessionID string) (*ocsdk.Session, error) {
+	title := fmt.Sprintf("chat-session-%s", chatSessionID)
 	return c.client.Session.New(ctx, ocsdk.SessionNewParams{
-		Title:     ocsdk.F(title),
-		Directory: ocsdk.F(c.directory),
+		Title: ocsdk.F(title),
 	})
 }
 
@@ -209,8 +106,7 @@ func (c *Client) Prompt(ctx context.Context, opencodeSessionID string, message s
 	}
 
 	params := ocsdk.SessionPromptParams{
-		Parts:     ocsdk.F(parts),
-		Directory: ocsdk.F(c.directory),
+		Parts: ocsdk.F(parts),
 	}
 
 	if modelRef.ProviderID != "" && modelRef.ModelID != "" {
@@ -238,15 +134,11 @@ func (c *Client) GetSession(ctx context.Context, opencodeSessionID string) (*ocs
 		return nil, fmt.Errorf("opencode session id is required")
 	}
 
-	return c.client.Session.Get(ctx, opencodeSessionID, ocsdk.SessionGetParams{
-		Directory: ocsdk.F(c.directory),
-	})
+	return c.client.Session.Get(ctx, opencodeSessionID, ocsdk.SessionGetParams{})
 }
 
 func (c *Client) ListSessions(ctx context.Context) ([]ocsdk.Session, error) {
-	resp, err := c.client.Session.List(ctx, ocsdk.SessionListParams{
-		Directory: ocsdk.F(c.directory),
-	})
+	resp, err := c.client.Session.List(ctx, ocsdk.SessionListParams{})
 	if err != nil {
 		return nil, err
 	}
@@ -261,14 +153,9 @@ func (c *Client) ListSessions(ctx context.Context) ([]ocsdk.Session, error) {
 func (c *Client) resolveModel(ctx context.Context, token string) (ModelRef, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
-		if c.defaultModel.ProviderID != "" && c.defaultModel.ModelID != "" {
-			return c.defaultModel, nil
-		}
-
 		if err := c.loadDefaultModel(ctx); err != nil {
 			return ModelRef{}, err
 		}
-
 		return c.defaultModel, nil
 	}
 
@@ -345,18 +232,4 @@ func extractReply(parts []ocsdk.Part) string {
 	}
 
 	return strings.TrimSpace(builder.String())
-}
-
-func (c *Client) NewSessionTitle(chatSessionID string) string {
-	title := c.sessionTitleTpl
-	if title == "" {
-		title = "chat-session-{session_id}"
-	}
-
-	title = strings.ReplaceAll(title, "{session_id}", chatSessionID)
-	if strings.TrimSpace(title) == "" {
-		return fmt.Sprintf("chat-session-%d", time.Now().Unix())
-	}
-
-	return title
 }

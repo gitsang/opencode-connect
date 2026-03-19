@@ -34,15 +34,11 @@ type ChatAPIPluginConfig struct {
 }
 
 type OpencodeConfig struct {
-	BaseURL         string                 `json:"base_url" yaml:"base_url" default:"http://127.0.0.1:4096" usage:"opencode server base URL"`
-	Password        string                 `json:"password" yaml:"password" usage:"opencode server password"`
-	PasswordHeader  string                 `json:"password_header" yaml:"password_header" default:"Authorization" usage:"header key for password authentication"`
-	PasswordScheme  string                 `json:"password_scheme" yaml:"password_scheme" default:"Bearer" usage:"header auth scheme, empty means raw password"`
-	Directory       string                 `json:"directory" yaml:"directory" default:"." usage:"working directory for opencode sessions"`
-	PromptTimeout   time.Duration          `json:"prompt_timeout" yaml:"prompt_timeout" default:"5m" usage:"prompt timeout"`
-	DefaultProvider string                 `json:"default_provider" yaml:"default_provider" default:"" usage:"default provider ID"`
-	DefaultModel    string                 `json:"default_model" yaml:"default_model" default:"" usage:"default model ID"`
-	ModelAliases    map[string]string      `json:"model_aliases" yaml:"model_aliases" usage:"alias to provider/model, e.g. gpt-5.4: openai/gpt-5.4"`
-	SessionTitleTpl string                 `json:"session_title_tpl" yaml:"session_title_tpl" default:"chat-session-{session_id}" usage:"new opencode session title template"`
-	ExtraHeaders    map[string]any `json:"extra_headers" yaml:"extra_headers" usage:"extra request headers"`
+	BaseURL        string            `json:"base_url" yaml:"base_url" default:"http://127.0.0.1:4096" usage:"opencode server base URL"`
+	Password       string            `json:"password" yaml:"password" usage:"opencode server password"`
+	PasswordHeader string            `json:"password_header" yaml:"password_header" default:"Authorization" usage:"header key for password authentication"`
+	PasswordScheme string            `json:"password_scheme" yaml:"password_scheme" default:"Bearer" usage:"header auth scheme, empty means raw password"`
+	PromptTimeout  time.Duration     `json:"prompt_timeout" yaml:"prompt_timeout" default:"5m" usage:"prompt timeout"`
+	ModelAliases   map[string]string `json:"model_aliases" yaml:"model_aliases" usage:"alias to provider/model, e.g. gpt-5.4: openai/gpt-5.4"`
+	ExtraHeaders   map[string]any    `json:"extra_headers" yaml:"extra_headers" usage:"extra request headers"`
 }
