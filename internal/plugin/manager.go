@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 )
 
-const defaultStopTimeout = 15 * time.Second
-
-func Run(ctx context.Context, plugins []Plugin) error {
+func Run(ctx context.Context, plugins []Plugin, handle HandleFunc) error {
 	if len(plugins) == 0 {
 		return fmt.Errorf("no enabled plugins configured")
+	}
+	if handle == nil {
+		return fmt.Errorf("handle function is required")
 	}
 
 	runCtx, cancel := context.WithCancel(ctx)
@@ -22,10 +22,10 @@ func Run(ctx context.Context, plugins []Plugin) error {
 
 	for _, currentPlugin := range plugins {
 		waitGroup.Add(1)
-		go func(plugin Plugin) {
+		go func(current Plugin) {
 			defer waitGroup.Done()
-			if err := plugin.Start(runCtx); err != nil {
-				errCh <- fmt.Errorf("%s plugin failed: %w", plugin.Name(), err)
+			if err := current.Serve(runCtx, handle); err != nil {
+				errCh <- fmt.Errorf("%s plugin failed: %w", current.Name(), err)
 				cancel()
 			}
 		}(currentPlugin)
@@ -37,37 +37,24 @@ func Run(ctx context.Context, plugins []Plugin) error {
 		close(done)
 	}()
 
-	var runErr error
 	select {
 	case err := <-errCh:
-		runErr = err
-		cancel()
+		<-done
+		return err
 	case <-ctx.Done():
-		cancel()
+		<-done
+		select {
+		case err := <-errCh:
+			return err
+		default:
+			return nil
+		}
 	case <-done:
-	}
-
-	stopCtx, stopCancel := context.WithTimeout(context.Background(), defaultStopTimeout)
-	defer stopCancel()
-
-	stopErr := stopAll(stopCtx, plugins)
-	<-done
-
-	if runErr != nil {
-		return runErr
-	}
-
-	return stopErr
-}
-
-func stopAll(ctx context.Context, plugins []Plugin) error {
-	var firstErr error
-	for index := len(plugins) - 1; index >= 0; index-- {
-		currentPlugin := plugins[index]
-		if err := currentPlugin.Stop(ctx); err != nil && firstErr == nil {
-			firstErr = fmt.Errorf("stop %s plugin: %w", currentPlugin.Name(), err)
+		select {
+		case err := <-errCh:
+			return err
+		default:
+			return nil
 		}
 	}
-
-	return firstErr
 }

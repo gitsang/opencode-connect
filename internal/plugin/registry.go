@@ -10,9 +10,6 @@ func BuildEnabledPlugins(deps Dependencies) ([]Plugin, error) {
 	if deps.Logger == nil {
 		return nil, fmt.Errorf("plugin dependencies.logger is required")
 	}
-	if deps.OpencodeClient == nil {
-		return nil, fmt.Errorf("plugin dependencies.opencode_client is required")
-	}
 	if deps.Config == nil {
 		return nil, fmt.Errorf("plugin dependencies.config is required")
 	}
@@ -22,7 +19,7 @@ func BuildEnabledPlugins(deps Dependencies) ([]Plugin, error) {
 			Key:     "chatapi",
 			Enabled: func(cfg *config.Config) bool { return cfg.Plugins.ChatAPI.Enabled },
 			Build: func(deps Dependencies) (Plugin, error) {
-				return NewChatAPI(deps.Logger, deps.OpencodeClient, deps.Config), nil
+				return NewChatAPI(deps.Logger, deps.Config), nil
 			},
 		},
 		{
@@ -43,15 +40,15 @@ func BuildEnabledPlugins(deps Dependencies) ([]Plugin, error) {
 			continue
 		}
 
-		plugin, err := registration.Build(deps)
+		currentPlugin, err := registration.Build(deps)
 		if err != nil {
 			return nil, fmt.Errorf("build %s plugin: %w", registration.Key, err)
 		}
-		if plugin == nil {
+		if currentPlugin == nil {
 			return nil, fmt.Errorf("build %s plugin: factory returned nil plugin", registration.Key)
 		}
 
-		plugins = append(plugins, plugin)
+		plugins = append(plugins, currentPlugin)
 	}
 
 	return plugins, nil

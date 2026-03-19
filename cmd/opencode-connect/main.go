@@ -9,8 +9,10 @@ import (
 
 	"github.com/gitsang/opencode-connect/internal/app"
 	"github.com/gitsang/opencode-connect/internal/config"
+	"github.com/gitsang/opencode-connect/internal/connect"
 	"github.com/gitsang/opencode-connect/internal/opencode"
 	"github.com/gitsang/opencode-connect/internal/plugin"
+	"github.com/gitsang/opencode-connect/internal/session"
 	"github.com/spf13/cobra"
 )
 
@@ -35,17 +37,17 @@ func newRootCmd() *cobra.Command {
 
 			logger := app.NewLogger(cfg)
 			slog.SetDefault(logger)
-			logger.Error("preparing...", slog.Any("cfg", cfg))
 
 			opencodeClient, err := opencode.NewClient(cfg)
 			if err != nil {
 				return err
 			}
 
+			conn := connect.New(opencodeClient, session.NewMemoryStore(), cfg)
+
 			plugins, err := plugin.BuildEnabledPlugins(plugin.Dependencies{
-				Logger:         logger,
-				OpencodeClient: opencodeClient,
-				Config:         cfg,
+				Logger: logger,
+				Config: cfg,
 			})
 			if err != nil {
 				return err
@@ -54,7 +56,7 @@ func newRootCmd() *cobra.Command {
 			runCtx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 			defer cancel()
 
-			if err := plugin.Run(runCtx, plugins); err != nil {
+			if err := plugin.Run(runCtx, plugins, conn.Handle); err != nil {
 				return err
 			}
 

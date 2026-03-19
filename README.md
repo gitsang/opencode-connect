@@ -9,13 +9,25 @@ This repository now includes a plugin-oriented `opencode-connect` runtime.
 
 - Configurable opencode server `base_url` and password header
 - Plugin-based integration entry (`plugins.chatapi`, `plugins.ume`, `plugins.mattermost`)
-- Each plugin manages its own runtime lifecycle (for example, HTTP server or websocket client)
-- ChatAPI plugin provides a `POST /chat` synchronous endpoint
+- `opencode-connect` owns unified workflow: parsing directives/commands, session resolution, and opencode prompt
+- Plugin only handles chat transport adaptation through callback contract
+- ChatAPI plugin provides a `POST /chat` synchronous endpoint via `Serve(handle)`
 - In-memory mapping from chat `session_id` to opencode session
 - Message head commands:
   - `@session:{opencode-session-id}`
   - `@model:{provider/model}` or alias from config
   - `/sessions`
+
+### Core/Plugin contract
+
+```go
+type Plugin interface {
+  Serve(ctx context.Context, handle func(context.Context, *connect.Message) (*connect.Message, error)) error
+  Send(ctx context.Context, req *connect.Message) (*connect.Message, error)
+}
+```
+
+`connect.Handle` is the single core entry for all plugin requests.
 
 ### Request
 

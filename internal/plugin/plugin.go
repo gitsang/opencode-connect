@@ -5,19 +5,20 @@ import (
 	"log/slog"
 
 	"github.com/gitsang/opencode-connect/internal/config"
-	"github.com/gitsang/opencode-connect/internal/opencode"
+	"github.com/gitsang/opencode-connect/internal/connect"
 )
+
+type HandleFunc func(ctx context.Context, req *connect.Message) (*connect.Message, error)
 
 type Plugin interface {
 	Name() string
-	Start(ctx context.Context) error
-	Stop(ctx context.Context) error
+	Serve(ctx context.Context, handle HandleFunc) error
+	Send(ctx context.Context, req *connect.Message) (*connect.Message, error)
 }
 
 type Dependencies struct {
-	Logger         *slog.Logger
-	OpencodeClient *opencode.Client
-	Config         *config.Config
+	Logger *slog.Logger
+	Config *config.Config
 }
 
 type Factory func(deps Dependencies) (Plugin, error)
