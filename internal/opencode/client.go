@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	opsdk "github.com/sst/opencode-sdk-go"
+	ocsdk "github.com/sst/opencode-sdk-go"
 	"github.com/sst/opencode-sdk-go/option"
 )
 
@@ -115,7 +115,7 @@ type PromptResult struct {
 }
 
 type Client struct {
-	client          *opsdk.Client
+	client          *ocsdk.Client
 	directory       string
 	promptTimeout   time.Duration
 	modelAliases    map[string]string
@@ -159,7 +159,7 @@ func NewClient(opts ...Option) (*Client, error) {
 		options = append(options, option.WithHeader(key, valueString))
 	}
 
-	client := opsdk.NewClient(options...)
+	client := ocsdk.NewClient(options...)
 
 	return &Client{
 		client:          client,
@@ -174,14 +174,14 @@ func NewClient(opts ...Option) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) CreateSession(ctx context.Context, title string) (*opsdk.Session, error) {
+func (c *Client) CreateSession(ctx context.Context, title string) (*ocsdk.Session, error) {
 	if title == "" {
 		title = "chat-session"
 	}
 
-	return c.client.Session.New(ctx, opsdk.SessionNewParams{
-		Title:     opsdk.F(title),
-		Directory: opsdk.F(c.directory),
+	return c.client.Session.New(ctx, ocsdk.SessionNewParams{
+		Title:     ocsdk.F(title),
+		Directory: ocsdk.F(c.directory),
 	})
 }
 
@@ -201,22 +201,22 @@ func (c *Client) Prompt(ctx context.Context, opencodeSessionID string, message s
 	promptCtx, cancel := context.WithTimeout(ctx, c.promptTimeout)
 	defer cancel()
 
-	parts := []opsdk.SessionPromptParamsPartUnion{
-		opsdk.TextPartInputParam{
-			Type: opsdk.F(opsdk.TextPartInputTypeText),
-			Text: opsdk.F(message),
+	parts := []ocsdk.SessionPromptParamsPartUnion{
+		ocsdk.TextPartInputParam{
+			Type: ocsdk.F(ocsdk.TextPartInputTypeText),
+			Text: ocsdk.F(message),
 		},
 	}
 
-	params := opsdk.SessionPromptParams{
-		Parts:     opsdk.F(parts),
-		Directory: opsdk.F(c.directory),
+	params := ocsdk.SessionPromptParams{
+		Parts:     ocsdk.F(parts),
+		Directory: ocsdk.F(c.directory),
 	}
 
 	if modelRef.ProviderID != "" && modelRef.ModelID != "" {
-		params.Model = opsdk.F(opsdk.SessionPromptParamsModel{
-			ProviderID: opsdk.F(modelRef.ProviderID),
-			ModelID:    opsdk.F(modelRef.ModelID),
+		params.Model = ocsdk.F(ocsdk.SessionPromptParamsModel{
+			ProviderID: ocsdk.F(modelRef.ProviderID),
+			ModelID:    ocsdk.F(modelRef.ModelID),
 		})
 	}
 
@@ -233,26 +233,26 @@ func (c *Client) Prompt(ctx context.Context, opencodeSessionID string, message s
 	}, nil
 }
 
-func (c *Client) GetSession(ctx context.Context, opencodeSessionID string) (*opsdk.Session, error) {
+func (c *Client) GetSession(ctx context.Context, opencodeSessionID string) (*ocsdk.Session, error) {
 	if strings.TrimSpace(opencodeSessionID) == "" {
 		return nil, fmt.Errorf("opencode session id is required")
 	}
 
-	return c.client.Session.Get(ctx, opencodeSessionID, opsdk.SessionGetParams{
-		Directory: opsdk.F(c.directory),
+	return c.client.Session.Get(ctx, opencodeSessionID, ocsdk.SessionGetParams{
+		Directory: ocsdk.F(c.directory),
 	})
 }
 
-func (c *Client) ListSessions(ctx context.Context) ([]opsdk.Session, error) {
-	resp, err := c.client.Session.List(ctx, opsdk.SessionListParams{
-		Directory: opsdk.F(c.directory),
+func (c *Client) ListSessions(ctx context.Context) ([]ocsdk.Session, error) {
+	resp, err := c.client.Session.List(ctx, ocsdk.SessionListParams{
+		Directory: ocsdk.F(c.directory),
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	if resp == nil {
-		return []opsdk.Session{}, nil
+		return []ocsdk.Session{}, nil
 	}
 
 	return *resp, nil
@@ -293,7 +293,7 @@ func (c *Client) loadDefaultModel(ctx context.Context) error {
 
 	c.providerLoaded = true
 
-	resp, err := c.client.App.Providers(ctx, opsdk.AppProvidersParams{})
+	resp, err := c.client.App.Providers(ctx, ocsdk.AppProvidersParams{})
 	if err != nil {
 		return err
 	}
@@ -328,11 +328,11 @@ func parseModelRef(value string) (ModelRef, error) {
 	return ModelRef{ProviderID: provider, ModelID: model}, nil
 }
 
-func extractReply(parts []opsdk.Part) string {
+func extractReply(parts []ocsdk.Part) string {
 	builder := strings.Builder{}
 
 	for _, part := range parts {
-		if part.Type != opsdk.PartTypeText {
+		if part.Type != ocsdk.PartTypeText {
 			continue
 		}
 
