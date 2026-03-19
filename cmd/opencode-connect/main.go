@@ -3,17 +3,14 @@ package main
 import (
 	"context"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/gitsang/opencode-connect/internal/app"
-	"github.com/gitsang/opencode-connect/internal/chatapi"
 	"github.com/gitsang/opencode-connect/internal/config"
 	"github.com/gitsang/opencode-connect/internal/opencode"
-	"github.com/gitsang/opencode-connect/internal/session"
+	"github.com/gitsang/opencode-connect/internal/plugin"
 	"github.com/spf13/cobra"
 )
 
@@ -44,45 +41,19 @@ func newRootCmd() *cobra.Command {
 				return err
 			}
 
-			store := session.NewMemoryStore()
-			chatApp := chatapi.NewChatAPI(opencodeClient, store, cfg)
-
-			handler := app.NewHTTPHandler(chatApp)
-			httpServer := &http.Server{
-				Addr:         cfg.Server.Listen,
-				Handler:      handler,
-				ReadTimeout:  cfg.Server.ReadTimeout,
-				WriteTimeout: cfg.Server.WriteTimeout,
-				IdleTimeout:  cfg.Server.IdleTimeout,
-			}
-
-			errCh := make(chan error, 1)
-			go func() {
-				slog.Info("chat api server started", "listen", cfg.Server.Listen)
-				errCh <- httpServer.ListenAndServe()
-			}()
-
-			sigCh := make(chan os.Signal, 1)
-			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-
-			select {
-			case sig := <-sigCh:
-				slog.Info("shutdown signal received", "signal", sig.String())
-			case srvErr := <-errCh:
-				if srvErr != nil && srvErr != http.ErrServerClosed {
-					return srvErr
-				}
-				return nil
-			}
-
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-			defer cancel()
-
-			if err := httpServer.Shutdown(ctx); err != nil {
+			plugins, err := plugin.BuildEnabledPlugins(logger, opencodeClient, cfg)
+			if err != nil {
 				return err
 			}
 
-			slog.Info("server stopped")
+			runCtx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+			defer cancel()
+
+			if err := plugin.Run(runCtx, plugins); err != nil {
+				return err
+			}
+
+			slog.Info("all plugins stopped")
 			return nil
 		},
 	}

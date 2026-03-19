@@ -3,13 +3,14 @@ An opencode plugin for connecting opencode to chat application
 
 ## Phase 1: Chat API
 
-This repository now includes a Go-based `opencode-connect` server with a synchronous Chat API adapter.
+This repository now includes a plugin-oriented `opencode-connect` runtime.
 
 ### Features
 
 - Configurable opencode server `base_url` and password header
-- Unified `ChatApp` interface for future adapters
-- `POST /chat` synchronous endpoint
+- Plugin-based integration entry (`plugins.chatapi`, `plugins.ume`, `plugins.mattermost`)
+- Each plugin manages its own runtime lifecycle (for example, HTTP server or websocket client)
+- ChatAPI plugin provides a `POST /chat` synchronous endpoint
 - In-memory mapping from chat `session_id` to opencode session
 - Message head commands:
   - `@session:{opencode-session-id}`
@@ -47,4 +48,17 @@ Environment variables are supported by `configer` with prefix `OPENCODE_CONNECT_
 
 - `OPENCODE_CONNECT_OPENCODE_BASE_URL`
 - `OPENCODE_CONNECT_OPENCODE_PASSWORD`
-- `OPENCODE_CONNECT_SERVER_LISTEN`
+- `OPENCODE_CONNECT_PLUGINS_CHATAPI_LISTEN`
+
+### Plugin config example
+
+```yaml
+plugins:
+  chatapi:
+    enabled: true
+    listen: ":8192"
+  ume:
+    enabled: false
+  mattermost:
+    enabled: false
+```

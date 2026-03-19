@@ -1,8 +1,14 @@
-server:
-  listen: ":8192"
-  read_timeout: 15s
-  write_timeout: 300s
-  idle_timeout: 60s
+plugins:
+  chatapi:
+    enabled: true
+    listen: ":8192"
+    read_timeout: 15s
+    write_timeout: 300s
+    idle_timeout: 60s
+  ume:
+    enabled: false
+  mattermost:
+    enabled: false
 
 opencode:
   base_url: "http://127.0.0.1:4096"

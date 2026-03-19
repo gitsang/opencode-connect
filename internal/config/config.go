@@ -9,12 +9,23 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig   `json:"server" yaml:"server"`
+	Plugins  PluginsConfig  `json:"plugins" yaml:"plugins"`
 	Opencode OpencodeConfig `json:"opencode" yaml:"opencode"`
 	Log      LogConfig      `json:"log" yaml:"log"`
 }
 
-type ServerConfig struct {
+type PluginsConfig struct {
+	ChatAPI    ChatAPIPluginConfig `json:"chatapi" yaml:"chatapi"`
+	UME        PluginConfig        `json:"ume" yaml:"ume"`
+	Mattermost PluginConfig        `json:"mattermost" yaml:"mattermost"`
+}
+
+type PluginConfig struct {
+	Enabled bool `json:"enabled" yaml:"enabled" default:"false" usage:"enable this plugin"`
+}
+
+type ChatAPIPluginConfig struct {
+	Enabled      bool          `json:"enabled" yaml:"enabled" default:"true" usage:"enable Chat API plugin"`
 	Listen       string        `json:"listen" yaml:"listen" default:":8192" usage:"HTTP server listen address"`
 	ReadTimeout  time.Duration `json:"read_timeout" yaml:"read_timeout" default:"15s" usage:"HTTP read timeout"`
 	WriteTimeout time.Duration `json:"write_timeout" yaml:"write_timeout" default:"300s" usage:"HTTP write timeout"`
@@ -77,6 +88,10 @@ func Load(cmd *cobra.Command, files []string) (*Config, error) {
 
 	if cfg.Opencode.ExtraHeaders == nil {
 		cfg.Opencode.ExtraHeaders = map[string]interface{}{}
+	}
+
+	if cfg.Plugins.ChatAPI.Listen == "" {
+		cfg.Plugins.ChatAPI.Listen = ":8192"
 	}
 
 	return cfg, nil
