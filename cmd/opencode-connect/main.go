@@ -94,10 +94,7 @@ func Run(cmd *cobra.Command, _ []string) error {
 		Logger:        logger,
 		EnableChatAPI: c.Plugins.ChatAPI.Enabled,
 		ChatAPI: plugin.ChatAPIConfig{
-			Listen:       c.Plugins.ChatAPI.Listen,
-			ReadTimeout:  c.Plugins.ChatAPI.ReadTimeout,
-			WriteTimeout: c.Plugins.ChatAPI.WriteTimeout,
-			IdleTimeout:  c.Plugins.ChatAPI.IdleTimeout,
+			Listen: c.Plugins.ChatAPI.Listen,
 		},
 	})
 	if err != nil {

@@ -1,9 +1,5 @@
 package main
 
-import (
-	"time"
-)
-
 type Config struct {
 	Log struct {
 		Handlers struct {
@@ -13,11 +9,8 @@ type Config struct {
 	}
 	Plugins struct {
 		ChatAPI struct {
-			Enabled      bool          `default:"true" usage:"enable Chat API plugin"`
-			Listen       string        `default:":8192" usage:"HTTP server listen address"`
-			ReadTimeout  time.Duration `default:"15s" usage:"HTTP read timeout"`
-			WriteTimeout time.Duration `default:"300s" usage:"HTTP write timeout"`
-			IdleTimeout  time.Duration `default:"60s" usage:"HTTP idle timeout"`
+			Enabled bool   `default:"true" usage:"enable Chat API plugin"`
+			Listen  string `default:":8192" usage:"HTTP server listen address"`
 		}
 	}
 	Opencode struct {

@@ -35,11 +35,8 @@ func (p *ChatAPI) Serve(ctx context.Context, handle HandleFunc) error {
 
 	serverConfig := p.cfg
 	server := &http.Server{
-		Addr:         serverConfig.Listen,
-		Handler:      p.newHTTPHandler(handle),
-		ReadTimeout:  serverConfig.ReadTimeout,
-		WriteTimeout: serverConfig.WriteTimeout,
-		IdleTimeout:  serverConfig.IdleTimeout,
+		Addr:    serverConfig.Listen,
+		Handler: p.newHTTPHandler(handle),
 	}
 
 	errCh := make(chan error, 1)
