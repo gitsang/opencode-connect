@@ -6,7 +6,6 @@ log:
       - format: "console"
         level: "info"
         verbosity: 3
-        attrs: {}
         output:
           stdout:
             enable: true
@@ -26,6 +25,6 @@ plugins:
     listen: ":8192"
 
 opencode:
-  base_url: "http://127.0.0.1:4096"
+  baseurl: "http://127.0.0.1:4096"
   username: ""
   password: ""
