@@ -3,6 +3,7 @@ package opencode
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -77,9 +78,7 @@ func WithModelAliases(aliases map[string]string) Option {
 		}
 
 		copied := make(map[string]string, len(aliases))
-		for alias, modelRef := range aliases {
-			copied[alias] = modelRef
-		}
+		maps.Copy(aliases, copied)
 		cfg.modelAliases = copied
 	}
 }
@@ -98,9 +97,7 @@ func WithExtraHeaders(headers map[string]any) Option {
 		}
 
 		copied := make(map[string]any, len(headers))
-		for key, value := range headers {
-			copied[key] = value
-		}
+		maps.Copy(headers, copied)
 		cfg.extraHeaders = copied
 	}
 }
