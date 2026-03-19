@@ -8,9 +8,9 @@ This repository now includes a plugin-oriented `opencode-connect` runtime.
 ### Features
 
 - Configurable opencode server `base_url` and password header
-- Plugin-based integration entry (`plugins.chatapi`, `plugins.ume`, `plugins.mattermost`)
-- `opencode-connect` owns unified workflow: parsing directives/commands, session resolution, and opencode prompt
-- Plugin only handles chat transport adaptation through callback contract
+- Plugin-based integration entry (`plugins.chatapi`)
+- `opencode-connect` core owns directives/commands parsing and prompt invocation
+- Plugin owns chat transport adaptation and chat-session/opencode-session binding
 - ChatAPI plugin provides a `POST /chat` synchronous endpoint via `Serve(handle)`
 - In-memory mapping from chat `session_id` to opencode session
 - Message head commands:
@@ -69,8 +69,4 @@ plugins:
   chatapi:
     enabled: true
     listen: ":8192"
-  ume:
-    enabled: false
-  mattermost:
-    enabled: false
 ```

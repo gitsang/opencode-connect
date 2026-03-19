@@ -13,6 +13,7 @@ import (
 	"github.com/gitsang/opencode-connect/internal/connect"
 	"github.com/gitsang/opencode-connect/internal/opencode"
 	"github.com/gitsang/opencode-connect/internal/plugin"
+	_ "github.com/gitsang/opencode-connect/internal/plugin/chatapi"
 	"github.com/gitsang/opencode-connect/internal/session"
 	"github.com/spf13/cobra"
 	ocsdk "github.com/sst/opencode-sdk-go"
@@ -85,14 +86,15 @@ func Run(cmd *cobra.Command, _ []string) error {
 
 	opencodeClient := opencode.NewClient(sdkClient)
 
-	conn := connect.New(
-		opencodeClient,
-		session.NewMemoryStore(),
-	)
+	sessionStore := session.NewMemoryStore()
+
+	connector := connect.New(opencodeClient)
 
 	plugins, err := plugin.BuildEnabledPlugins(plugin.Dependencies{
-		Logger:        logger,
-		EnableChatAPI: c.Plugins.ChatAPI.Enabled,
+		Logger:         logger,
+		OpencodeClient: opencodeClient,
+		SessionStore:   sessionStore,
+		EnableChatAPI:  c.Plugins.ChatAPI.Enabled,
 		ChatAPI: plugin.ChatAPIConfig{
 			Listen: c.Plugins.ChatAPI.Listen,
 		},
@@ -104,7 +106,7 @@ func Run(cmd *cobra.Command, _ []string) error {
 	runCtx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	if err := plugin.Run(runCtx, plugins, conn.Handle); err != nil {
+	if err := plugin.Run(runCtx, plugins, connector.Handle); err != nil {
 		return err
 	}
 

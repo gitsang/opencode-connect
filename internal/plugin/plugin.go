@@ -5,6 +5,8 @@ import (
 	"log/slog"
 
 	"github.com/gitsang/opencode-connect/internal/connect"
+	"github.com/gitsang/opencode-connect/internal/opencode"
+	"github.com/gitsang/opencode-connect/internal/session"
 )
 
 type HandleFunc func(ctx context.Context, req *connect.Message) (*connect.Message, error)
@@ -16,11 +18,13 @@ type Plugin interface {
 }
 
 type Dependencies struct {
-	Logger        *slog.Logger
-	EnableChatAPI bool
-	EnableUME     bool
+	Logger           *slog.Logger
+	OpencodeClient   *opencode.Client
+	SessionStore     session.Store
+	EnableChatAPI    bool
+	EnableUME        bool
 	EnableMattermost bool
-	ChatAPI       ChatAPIConfig
+	ChatAPI          ChatAPIConfig
 }
 
 type ChatAPIConfig struct {
