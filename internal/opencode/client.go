@@ -3,38 +3,11 @@ package opencode
 import (
 	"context"
 	"fmt"
-	"maps"
 	"strings"
 	"time"
 
 	ocsdk "github.com/sst/opencode-sdk-go"
 )
-
-type Option func(*clientConfig)
-
-type clientConfig struct {
-	promptTimeout time.Duration
-	modelAliases  map[string]string
-}
-
-func WithPromptTimeout(timeout time.Duration) Option {
-	return func(cfg *clientConfig) {
-		cfg.promptTimeout = timeout
-	}
-}
-
-func WithModelAliases(aliases map[string]string) Option {
-	return func(cfg *clientConfig) {
-		if aliases == nil {
-			cfg.modelAliases = nil
-			return
-		}
-
-		copied := make(map[string]string, len(aliases))
-		maps.Copy(copied, aliases)
-		cfg.modelAliases = copied
-	}
-}
 
 type ModelRef struct {
 	ProviderID string
@@ -50,28 +23,13 @@ type PromptResult struct {
 
 type Client struct {
 	client         *ocsdk.Client
-	promptTimeout  time.Duration
-	modelAliases   map[string]string
 	defaultModel   ModelRef
 	providerLoaded bool
 }
 
-func NewClient(sdkClient *ocsdk.Client, opts ...Option) *Client {
-	cfg := clientConfig{
-		promptTimeout: 5 * time.Minute,
-	}
-
-	for _, applyOption := range opts {
-		if applyOption == nil {
-			continue
-		}
-		applyOption(&cfg)
-	}
-
+func NewClient(sdkClient *ocsdk.Client) *Client {
 	return &Client{
-		client:        sdkClient,
-		promptTimeout: cfg.promptTimeout,
-		modelAliases:  cfg.modelAliases,
+		client: sdkClient,
 	}
 }
 
@@ -95,7 +53,7 @@ func (c *Client) Prompt(ctx context.Context, opencodeSessionID string, message s
 		return nil, err
 	}
 
-	promptCtx, cancel := context.WithTimeout(ctx, c.promptTimeout)
+	promptCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
 	parts := []ocsdk.SessionPromptParamsPartUnion{
@@ -157,14 +115,6 @@ func (c *Client) resolveModel(ctx context.Context, token string) (ModelRef, erro
 			return ModelRef{}, err
 		}
 		return c.defaultModel, nil
-	}
-
-	if alias, ok := c.modelAliases[token]; ok {
-		parsed, err := parseModelRef(alias)
-		if err != nil {
-			return ModelRef{}, fmt.Errorf("invalid model alias %q: %w", token, err)
-		}
-		return parsed, nil
 	}
 
 	return parseModelRef(token)

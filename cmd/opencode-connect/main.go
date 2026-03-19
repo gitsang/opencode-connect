@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"os"
@@ -13,9 +14,9 @@ import (
 	"github.com/gitsang/opencode-connect/internal/opencode"
 	"github.com/gitsang/opencode-connect/internal/plugin"
 	"github.com/gitsang/opencode-connect/internal/session"
+	"github.com/spf13/cobra"
 	ocsdk "github.com/sst/opencode-sdk-go"
 	"github.com/sst/opencode-sdk-go/option"
-	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
@@ -75,24 +76,14 @@ func Run(cmd *cobra.Command, _ []string) error {
 	sdkOpts := []option.RequestOption{
 		option.WithBaseURL(c.Opencode.BaseURL),
 	}
-	if c.Opencode.Password != "" {
-		authValue := c.Opencode.Password
-		if c.Opencode.PasswordScheme != "" {
-			authValue = fmt.Sprintf("%s %s", c.Opencode.PasswordScheme, c.Opencode.Password)
-		}
-		sdkOpts = append(sdkOpts, option.WithHeader(c.Opencode.PasswordHeader, authValue))
-	}
-	for key, value := range c.Opencode.ExtraHeaders {
-		if strVal := fmt.Sprint(value); strVal != "" {
-			sdkOpts = append(sdkOpts, option.WithHeader(key, strVal))
-		}
+	if c.Opencode.Username != "" || c.Opencode.Password != "" {
+		creds := fmt.Sprintf("%s:%s", c.Opencode.Username, c.Opencode.Password)
+		authValue := "Basic " + base64.StdEncoding.EncodeToString([]byte(creds))
+		sdkOpts = append(sdkOpts, option.WithHeader("Authorization", authValue))
 	}
 	sdkClient := ocsdk.NewClient(sdkOpts...)
 
-	opencodeClient := opencode.NewClient(sdkClient,
-		opencode.WithPromptTimeout(c.Opencode.PromptTimeout),
-		opencode.WithModelAliases(c.Opencode.ModelAliases),
-	)
+	opencodeClient := opencode.NewClient(sdkClient)
 
 	conn := connect.New(
 		opencodeClient,
@@ -100,10 +91,8 @@ func Run(cmd *cobra.Command, _ []string) error {
 	)
 
 	plugins, err := plugin.BuildEnabledPlugins(plugin.Dependencies{
-		Logger:           logger,
-		EnableChatAPI:    c.Plugins.ChatAPI.Enabled,
-		EnableUME:        c.Plugins.UME.Enabled,
-		EnableMattermost: c.Plugins.Mattermost.Enabled,
+		Logger:        logger,
+		EnableChatAPI: c.Plugins.ChatAPI.Enabled,
 		ChatAPI: plugin.ChatAPIConfig{
 			Listen:       c.Plugins.ChatAPI.Listen,
 			ReadTimeout:  c.Plugins.ChatAPI.ReadTimeout,
