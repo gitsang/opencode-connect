@@ -3,14 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/gitsang/configer"
-	"github.com/gitsang/logi"
 	"github.com/gitsang/opencode-connect/internal/connect"
 	"github.com/gitsang/opencode-connect/internal/opencode"
 	"github.com/gitsang/opencode-connect/internal/plugin"
@@ -62,18 +60,20 @@ func Run(cmd *cobra.Command, _ []string) error {
 		os.Exit(-1)
 	}
 
-	handler := logi.NewHandler(logi.HandlerOptions{
-		Format:    cfg.Log.Format,
-		Color:     cfg.Log.Color,
-		Level:     cfg.Log.Level,
-		Verbosity: cfg.Log.Verbosity,
-		Writers:   []io.Writer{os.Stdout},
-		Attrs: map[string]interface{}{
-			"service": "opencode-connect",
-		},
-	})
+	// Setup log handler
+	logHandlers, err := BuildLogHandlers(c)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(-1)
+	}
 
-	logger := slog.New(handler)
+	// Preparing
+	logger := slog.New(logHandlers.Get(c.Log.Handlers.Default))
+	logger.Debug("Preparing...",
+		slog.Any("flags", rootFlags),
+		slog.Any("config", c),
+		slog.String("pid", fmt.Sprintf("%d", os.Getpid())),
+	)
 
 	opencodeClient, err := opencode.NewClient(cfg)
 	if err != nil {
