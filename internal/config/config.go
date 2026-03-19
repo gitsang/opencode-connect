@@ -15,7 +15,7 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Listen       string        `json:"listen" yaml:"listen" default:":8080" usage:"HTTP server listen address"`
+	Listen       string        `json:"listen" yaml:"listen" default:":8192" usage:"HTTP server listen address"`
 	ReadTimeout  time.Duration `json:"read_timeout" yaml:"read_timeout" default:"15s" usage:"HTTP read timeout"`
 	WriteTimeout time.Duration `json:"write_timeout" yaml:"write_timeout" default:"300s" usage:"HTTP write timeout"`
 	IdleTimeout  time.Duration `json:"idle_timeout" yaml:"idle_timeout" default:"60s" usage:"HTTP idle timeout"`
@@ -43,6 +43,8 @@ type LogConfig struct {
 }
 
 func Load(cmd *cobra.Command, files []string) (*Config, error) {
+	_ = cmd
+
 	cfg := new(Config)
 
 	cfger := configer.New(
@@ -50,11 +52,6 @@ func Load(cmd *cobra.Command, files []string) (*Config, error) {
 		configer.WithEnvBind(
 			configer.WithEnvPrefix("OPENCODE_CONNECT"),
 			configer.WithEnvDelim("_"),
-		),
-		configer.WithFlagBind(
-			configer.WithCommand(cmd),
-			configer.WithFlagPrefix("opencode-connect"),
-			configer.WithFlagDelim("."),
 		),
 	)
 

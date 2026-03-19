@@ -1,0 +1,26 @@
+SHELL := /bin/bash
+
+BINARY_NAME := opencode-connect
+BINARY_DIR := .dist
+BINARY_PATH := $(BINARY_DIR)/$(BINARY_NAME)
+IMAGE_NAME ?= opencode-connect:local
+CONTAINER_NAME ?= opencode-connect
+CONFIG_FILE ?= $(PWD)/configs/config.yaml
+PORT ?= 8192
+
+.PHONY: build-binary build-container container-run
+
+build-binary:
+	@mkdir -p "$(BINARY_DIR)"
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o "$(BINARY_PATH)" ./cmd/opencode-connect
+	@echo "Built binary: $(BINARY_PATH)"
+
+build-container:
+	@test -f "$(BINARY_PATH)" || (echo "Missing $(BINARY_PATH). Run: make build-binary" && exit 1)
+	docker build -f Containerfile -t "$(IMAGE_NAME)" .
+	@echo "Built image: $(IMAGE_NAME)"
+
+run-container:
+	@test -f "$(CONFIG_FILE)" || (echo "Missing config file: $(CONFIG_FILE)" && exit 1)
+	docker compose up -d
+	@echo "Started container: $(CONTAINER_NAME) (port $(PORT))"

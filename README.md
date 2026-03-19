@@ -24,14 +24,14 @@ curl -X POST -H "Content-Type: application/json" \
     "message": "hello world",
     "session_id": "1"
   }' \
-  http://127.0.0.1:8080/chat
+  http://127.0.0.1:8192/chat
 ```
 
 ### Build & Run
 
 ```bash
-cp config.example.yaml config.yaml
-go run ./cmd/opencode-connect -c config.yaml
+cp configs/config.example.yaml configs/config.yaml
+go run ./cmd/opencode-connect -c configs/config.yaml
 ```
 
 ### Test script

@@ -1,5 +1,5 @@
 server:
-  listen: ":8080"
+  listen: ":8192"
   read_timeout: 15s
   write_timeout: 300s
   idle_timeout: 60s
