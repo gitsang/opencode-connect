@@ -138,7 +138,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-# opencode-connect local configs
+# opencode-config.*.yamlconnect local configs
 configs/config.yaml
 
 # dist files

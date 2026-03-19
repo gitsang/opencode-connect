@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gitsang/opencode-connect/internal/config"
 	"github.com/gitsang/opencode-connect/internal/opencode"
 	"github.com/gitsang/opencode-connect/internal/session"
 )
@@ -16,15 +15,13 @@ import (
 type OpencodeConnect struct {
 	opencodeClient *opencode.Client
 	sessionStore   session.Store
-	cfg            *config.Config
 	resolveMu      sync.Mutex
 }
 
-func New(opencodeClient *opencode.Client, sessionStore session.Store, cfg *config.Config) *OpencodeConnect {
+func New(opencodeClient *opencode.Client, sessionStore session.Store) *OpencodeConnect {
 	return &OpencodeConnect{
 		opencodeClient: opencodeClient,
 		sessionStore:   sessionStore,
-		cfg:            cfg,
 	}
 }
 

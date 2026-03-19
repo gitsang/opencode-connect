@@ -1,17 +1,24 @@
-package config
+package main
 
 import (
-	"fmt"
 	"time"
-
-	"github.com/gitsang/configer"
-	"github.com/spf13/cobra"
 )
 
 type Config struct {
+	Log struct {
+		Handlers struct {
+			Default      string `json:"default" yaml:"default"`
+			Grpc         string `json:"grpc" yaml:"grpc"`
+			Gorm         string `json:"gorm" yaml:"gorm"`
+			Mq           string `json:"mq" yaml:"mq"`
+			Synchronizer string `json:"synchronizer" yaml:"synchronizer"`
+			Cleaner      string `json:"cleaner" yaml:"cleaner"`
+			Bundler      string `json:"bundler" yaml:"bundler"`
+		} `json:"handlers" yaml:"handlers"`
+		Providers map[string][]LogConfig `json:"providers" yaml:"providers"`
+	} `json:"log" yaml:"log"`
 	Plugins  PluginsConfig  `json:"plugins" yaml:"plugins"`
 	Opencode OpencodeConfig `json:"opencode" yaml:"opencode"`
-	Log      LogConfig      `json:"log" yaml:"log"`
 }
 
 type PluginsConfig struct {
@@ -44,55 +51,4 @@ type OpencodeConfig struct {
 	ModelAliases    map[string]string      `json:"model_aliases" yaml:"model_aliases" usage:"alias to provider/model, e.g. gpt-5.4: openai/gpt-5.4"`
 	SessionTitleTpl string                 `json:"session_title_tpl" yaml:"session_title_tpl" default:"chat-session-{session_id}" usage:"new opencode session title template"`
 	ExtraHeaders    map[string]interface{} `json:"extra_headers" yaml:"extra_headers" usage:"extra request headers"`
-}
-
-type LogConfig struct {
-	Level     string `json:"level" yaml:"level" default:"info" usage:"log level"`
-	Format    string `json:"format" yaml:"format" default:"console" usage:"log format: console/json/text"`
-	Color     bool   `json:"color" yaml:"color" default:"true" usage:"enable color output"`
-	Verbosity int    `json:"verbosity" yaml:"verbosity" default:"1" usage:"log source verbosity"`
-}
-
-func Load(cmd *cobra.Command, files []string) (*Config, error) {
-	_ = cmd
-
-	cfg := new(Config)
-
-	cfger := configer.New(
-		configer.WithTemplate(new(Config)),
-		configer.WithEnvBind(
-			configer.WithEnvPrefix("OPENCODE_CONNECT"),
-			configer.WithEnvDelim("_"),
-		),
-	)
-
-	if err := cfger.Load(cfg, files...); err != nil {
-		return nil, err
-	}
-
-	if cfg.Opencode.BaseURL == "" {
-		return nil, fmt.Errorf("opencode.base_url is required")
-	}
-
-	if cfg.Opencode.Directory == "" {
-		cfg.Opencode.Directory = "."
-	}
-
-	if cfg.Opencode.SessionTitleTpl == "" {
-		cfg.Opencode.SessionTitleTpl = "chat-session-{session_id}"
-	}
-
-	if cfg.Opencode.ModelAliases == nil {
-		cfg.Opencode.ModelAliases = map[string]string{}
-	}
-
-	if cfg.Opencode.ExtraHeaders == nil {
-		cfg.Opencode.ExtraHeaders = map[string]interface{}{}
-	}
-
-	if cfg.Plugins.ChatAPI.Listen == "" {
-		cfg.Plugins.ChatAPI.Listen = ":8192"
-	}
-
-	return cfg, nil
 }

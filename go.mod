@@ -3,6 +3,7 @@ module github.com/gitsang/opencode-connect
 go 1.25.5
 
 require (
+	gitcode.yealink.com/server/devops/yops/ykit/util v0.0.11 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/gitsang/configer v0.0.1 // indirect
 	github.com/gitsang/defaults v1.8.2 // indirect
