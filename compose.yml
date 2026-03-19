@@ -8,12 +8,9 @@ services:
     ports:
       - "8192:8192"
     volumes:
-      - ./configs/config.yaml:/app/configs/config.yaml:ro
+      - ./configs/config.container.yaml:/app/configs/config.yaml:ro
     environment:
       OPENCODE_CONNECT_PLUGINS_CHATAPI_ENABLED: "true"
-      OPENCODE_CONNECT_PLUGINS_CHATAPI_LISTEN: ":8192"
-      OPENCODE_CONNECT_OPENCODE_BASE_URL: "http://host.docker.internal:4096"
-      OPENCODE_CONNECT_OPENCODE_PASSWORD: ""
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command:

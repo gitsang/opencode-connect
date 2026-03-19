@@ -5,7 +5,6 @@ BINARY_DIR := .dist
 BINARY_PATH := $(BINARY_DIR)/$(BINARY_NAME)
 IMAGE_NAME ?= opencode-connect:local
 CONTAINER_NAME ?= opencode-connect
-CONFIG_FILE ?= $(PWD)/configs/config.yaml
 PORT ?= 8192
 
 .PHONY: build-binary build-container container-run
@@ -21,6 +20,5 @@ build-container:
 	@echo "Built image: $(IMAGE_NAME)"
 
 run-container:
-	@test -f "$(CONFIG_FILE)" || (echo "Missing config file: $(CONFIG_FILE)" && exit 1)
 	docker compose up -d
 	@echo "Started container: $(CONTAINER_NAME) (port $(PORT))"
