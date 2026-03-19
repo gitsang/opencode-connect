@@ -23,7 +23,7 @@ type clientConfig struct {
 	defaultModel    string
 	modelAliases    map[string]string
 	sessionTitleTpl string
-	extraHeaders    map[string]interface{}
+	extraHeaders    map[string]any
 }
 
 func WithBaseURL(baseURL string) Option {
@@ -90,14 +90,14 @@ func WithSessionTitleTemplate(template string) Option {
 	}
 }
 
-func WithExtraHeaders(headers map[string]interface{}) Option {
+func WithExtraHeaders(headers map[string]any) Option {
 	return func(cfg *clientConfig) {
 		if headers == nil {
 			cfg.extraHeaders = nil
 			return
 		}
 
-		copied := make(map[string]interface{}, len(headers))
+		copied := make(map[string]any, len(headers))
 		for key, value := range headers {
 			copied[key] = value
 		}

@@ -44,5 +44,5 @@ type OpencodeConfig struct {
 	DefaultModel    string                 `json:"default_model" yaml:"default_model" default:"" usage:"default model ID"`
 	ModelAliases    map[string]string      `json:"model_aliases" yaml:"model_aliases" usage:"alias to provider/model, e.g. gpt-5.4: openai/gpt-5.4"`
 	SessionTitleTpl string                 `json:"session_title_tpl" yaml:"session_title_tpl" default:"chat-session-{session_id}" usage:"new opencode session title template"`
-	ExtraHeaders    map[string]interface{} `json:"extra_headers" yaml:"extra_headers" usage:"extra request headers"`
+	ExtraHeaders    map[string]any `json:"extra_headers" yaml:"extra_headers" usage:"extra request headers"`
 }

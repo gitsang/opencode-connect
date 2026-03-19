@@ -78,7 +78,7 @@ func (p *ChatAPI) newHTTPHandler(handle HandleFunc) http.Handler {
 
 	mux.HandleFunc("/chat", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
-			writeJSON(w, http.StatusMethodNotAllowed, map[string]interface{}{"error": "method not allowed"})
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
 			return
 		}
 
@@ -86,7 +86,7 @@ func (p *ChatAPI) newHTTPHandler(handle HandleFunc) http.Handler {
 
 		var req connect.Message
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]interface{}{"error": "invalid json"})
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid json"})
 			return
 		}
 
@@ -97,7 +97,7 @@ func (p *ChatAPI) newHTTPHandler(handle HandleFunc) http.Handler {
 			if errors.As(err, &connectError) {
 				status = connectError.StatusCode
 			}
-			writeJSON(w, status, map[string]interface{}{"error": err.Error()})
+			writeJSON(w, status, map[string]any{"error": err.Error()})
 			return
 		}
 
@@ -107,7 +107,7 @@ func (p *ChatAPI) newHTTPHandler(handle HandleFunc) http.Handler {
 	return mux
 }
 
-func writeJSON(w http.ResponseWriter, statusCode int, payload interface{}) {
+func writeJSON(w http.ResponseWriter, statusCode int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	_ = json.NewEncoder(w).Encode(payload)
