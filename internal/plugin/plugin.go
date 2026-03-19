@@ -3,8 +3,8 @@ package plugin
 import (
 	"context"
 	"log/slog"
+	"time"
 
-	"github.com/gitsang/opencode-connect/internal/config"
 	"github.com/gitsang/opencode-connect/internal/connect"
 )
 
@@ -17,14 +17,24 @@ type Plugin interface {
 }
 
 type Dependencies struct {
-	Logger *slog.Logger
-	Config *config.Config
+	Logger           *slog.Logger
+	EnableChatAPI    bool
+	EnableUME        bool
+	EnableMattermost bool
+	ChatAPI          ChatAPIConfig
+}
+
+type ChatAPIConfig struct {
+	Listen       string
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
+	IdleTimeout  time.Duration
 }
 
 type Factory func(deps Dependencies) (Plugin, error)
 
 type Registration struct {
 	Key     string
-	Enabled func(cfg *config.Config) bool
+	Enabled func(deps Dependencies) bool
 	Build   Factory
 }

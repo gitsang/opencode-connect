@@ -47,11 +47,6 @@ func init() {
 }
 
 func Run(cmd *cobra.Command, _ []string) error {
-	// Create context
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	// Load configuration
 	var c Config
 	err := cfger.Load(&c, rootFlags.ConfigFile)
@@ -75,16 +70,39 @@ func Run(cmd *cobra.Command, _ []string) error {
 		slog.String("pid", fmt.Sprintf("%d", os.Getpid())),
 	)
 
-	opencodeClient, err := opencode.NewClient(cfg)
+	opencodeClient, err := opencode.NewClient(
+		opencode.WithBaseURL(c.Opencode.BaseURL),
+		opencode.WithPassword(c.Opencode.Password),
+		opencode.WithPasswordHeader(c.Opencode.PasswordHeader),
+		opencode.WithPasswordScheme(c.Opencode.PasswordScheme),
+		opencode.WithDirectory(c.Opencode.Directory),
+		opencode.WithPromptTimeout(c.Opencode.PromptTimeout),
+		opencode.WithDefaultModel(c.Opencode.DefaultProvider, c.Opencode.DefaultModel),
+		opencode.WithModelAliases(c.Opencode.ModelAliases),
+		opencode.WithSessionTitleTemplate(c.Opencode.SessionTitleTpl),
+		opencode.WithExtraHeaders(c.Opencode.ExtraHeaders),
+	)
 	if err != nil {
 		return err
 	}
 
-	conn := connect.New(opencodeClient, session.NewMemoryStore(), cfg)
+	conn := connect.New(
+		opencodeClient,
+		session.NewMemoryStore(),
+		connect.WithDefaultDirectory(c.Opencode.Directory),
+	)
 
 	plugins, err := plugin.BuildEnabledPlugins(plugin.Dependencies{
-		Logger: logger,
-		Config: cfg,
+		Logger:           logger,
+		EnableChatAPI:    c.Plugins.ChatAPI.Enabled,
+		EnableUME:        c.Plugins.UME.Enabled,
+		EnableMattermost: c.Plugins.Mattermost.Enabled,
+		ChatAPI: plugin.ChatAPIConfig{
+			Listen:       c.Plugins.ChatAPI.Listen,
+			ReadTimeout:  c.Plugins.ChatAPI.ReadTimeout,
+			WriteTimeout: c.Plugins.ChatAPI.WriteTimeout,
+			IdleTimeout:  c.Plugins.ChatAPI.IdleTimeout,
+		},
 	})
 	if err != nil {
 		return err

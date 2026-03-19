@@ -7,13 +7,7 @@ import (
 type Config struct {
 	Log struct {
 		Handlers struct {
-			Default      string `json:"default" yaml:"default"`
-			Grpc         string `json:"grpc" yaml:"grpc"`
-			Gorm         string `json:"gorm" yaml:"gorm"`
-			Mq           string `json:"mq" yaml:"mq"`
-			Synchronizer string `json:"synchronizer" yaml:"synchronizer"`
-			Cleaner      string `json:"cleaner" yaml:"cleaner"`
-			Bundler      string `json:"bundler" yaml:"bundler"`
+			Default string `json:"default" yaml:"default"`
 		} `json:"handlers" yaml:"handlers"`
 		Providers map[string][]LogConfig `json:"providers" yaml:"providers"`
 	} `json:"log" yaml:"log"`

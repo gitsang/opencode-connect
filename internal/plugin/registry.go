@@ -2,41 +2,36 @@ package plugin
 
 import (
 	"fmt"
-
-	"github.com/gitsang/opencode-connect/internal/config"
 )
 
 func BuildEnabledPlugins(deps Dependencies) ([]Plugin, error) {
 	if deps.Logger == nil {
 		return nil, fmt.Errorf("plugin dependencies.logger is required")
 	}
-	if deps.Config == nil {
-		return nil, fmt.Errorf("plugin dependencies.config is required")
-	}
 
 	registrations := []Registration{
 		{
 			Key:     "chatapi",
-			Enabled: func(cfg *config.Config) bool { return cfg.Plugins.ChatAPI.Enabled },
+			Enabled: func(deps Dependencies) bool { return deps.EnableChatAPI },
 			Build: func(deps Dependencies) (Plugin, error) {
-				return NewChatAPI(deps.Logger, deps.Config), nil
+				return NewChatAPI(deps.Logger, deps.ChatAPI), nil
 			},
 		},
 		{
 			Key:     "ume",
-			Enabled: func(cfg *config.Config) bool { return cfg.Plugins.UME.Enabled },
+			Enabled: func(deps Dependencies) bool { return deps.EnableUME },
 			Build:   unsupportedFactory("UME"),
 		},
 		{
 			Key:     "mattermost",
-			Enabled: func(cfg *config.Config) bool { return cfg.Plugins.Mattermost.Enabled },
+			Enabled: func(deps Dependencies) bool { return deps.EnableMattermost },
 			Build:   unsupportedFactory("Mattermost"),
 		},
 	}
 
 	plugins := make([]Plugin, 0, len(registrations))
 	for _, registration := range registrations {
-		if !registration.Enabled(deps.Config) {
+		if !registration.Enabled(deps) {
 			continue
 		}
 

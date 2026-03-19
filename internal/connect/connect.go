@@ -15,14 +15,36 @@ import (
 type OpencodeConnect struct {
 	opencodeClient *opencode.Client
 	sessionStore   session.Store
+	defaultDir     string
 	resolveMu      sync.Mutex
 }
 
-func New(opencodeClient *opencode.Client, sessionStore session.Store) *OpencodeConnect {
-	return &OpencodeConnect{
+type Option func(*OpencodeConnect)
+
+func WithDefaultDirectory(directory string) Option {
+	return func(conn *OpencodeConnect) {
+		conn.defaultDir = strings.TrimSpace(directory)
+	}
+}
+
+func New(opencodeClient *opencode.Client, sessionStore session.Store, opts ...Option) *OpencodeConnect {
+	conn := &OpencodeConnect{
 		opencodeClient: opencodeClient,
 		sessionStore:   sessionStore,
 	}
+
+	for _, applyOption := range opts {
+		if applyOption == nil {
+			continue
+		}
+		applyOption(conn)
+	}
+
+	if conn.defaultDir == "" {
+		conn.defaultDir = "."
+	}
+
+	return conn
 }
 
 func (c *OpencodeConnect) Handle(ctx context.Context, req *Message) (*Message, error) {
@@ -107,14 +129,14 @@ func (c *OpencodeConnect) listSessions(ctx context.Context) (string, error) {
 	}
 
 	if len(sessions) == 0 {
-		return "- " + c.cfg.Opencode.Directory, nil
+		return "- " + c.defaultDir, nil
 	}
 
 	byDirectory := map[string][]string{}
 	for _, currentSession := range sessions {
 		directory := currentSession.Directory
 		if strings.TrimSpace(directory) == "" {
-			directory = c.cfg.Opencode.Directory
+			directory = c.defaultDir
 		}
 
 		title := strings.TrimSpace(currentSession.Title)

@@ -9,16 +9,15 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gitsang/opencode-connect/internal/config"
 	"github.com/gitsang/opencode-connect/internal/connect"
 )
 
 type ChatAPI struct {
 	logger *slog.Logger
-	cfg    *config.Config
+	cfg    ChatAPIConfig
 }
 
-func NewChatAPI(logger *slog.Logger, cfg *config.Config) *ChatAPI {
+func NewChatAPI(logger *slog.Logger, cfg ChatAPIConfig) *ChatAPI {
 	return &ChatAPI{
 		logger: logger,
 		cfg:    cfg,
@@ -34,7 +33,7 @@ func (p *ChatAPI) Serve(ctx context.Context, handle HandleFunc) error {
 		return fmt.Errorf("chatapi handle is required")
 	}
 
-	serverConfig := p.cfg.Plugins.ChatAPI
+	serverConfig := p.cfg
 	server := &http.Server{
 		Addr:         serverConfig.Listen,
 		Handler:      p.newHTTPHandler(handle),

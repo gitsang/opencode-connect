@@ -8,9 +8,102 @@ import (
 
 	opsdk "github.com/sst/opencode-sdk-go"
 	"github.com/sst/opencode-sdk-go/option"
-
-	"github.com/gitsang/opencode-connect/internal/config"
 )
+
+type Option func(*clientConfig)
+
+type clientConfig struct {
+	baseURL         string
+	password        string
+	passwordHeader  string
+	passwordScheme  string
+	directory       string
+	promptTimeout   time.Duration
+	defaultProvider string
+	defaultModel    string
+	modelAliases    map[string]string
+	sessionTitleTpl string
+	extraHeaders    map[string]interface{}
+}
+
+func WithBaseURL(baseURL string) Option {
+	return func(cfg *clientConfig) {
+		cfg.baseURL = strings.TrimSpace(baseURL)
+	}
+}
+
+func WithPassword(password string) Option {
+	return func(cfg *clientConfig) {
+		cfg.password = password
+	}
+}
+
+func WithPasswordHeader(passwordHeader string) Option {
+	return func(cfg *clientConfig) {
+		cfg.passwordHeader = strings.TrimSpace(passwordHeader)
+	}
+}
+
+func WithPasswordScheme(passwordScheme string) Option {
+	return func(cfg *clientConfig) {
+		cfg.passwordScheme = strings.TrimSpace(passwordScheme)
+	}
+}
+
+func WithDirectory(directory string) Option {
+	return func(cfg *clientConfig) {
+		cfg.directory = strings.TrimSpace(directory)
+	}
+}
+
+func WithPromptTimeout(timeout time.Duration) Option {
+	return func(cfg *clientConfig) {
+		cfg.promptTimeout = timeout
+	}
+}
+
+func WithDefaultModel(providerID string, modelID string) Option {
+	return func(cfg *clientConfig) {
+		cfg.defaultProvider = strings.TrimSpace(providerID)
+		cfg.defaultModel = strings.TrimSpace(modelID)
+	}
+}
+
+func WithModelAliases(aliases map[string]string) Option {
+	return func(cfg *clientConfig) {
+		if aliases == nil {
+			cfg.modelAliases = nil
+			return
+		}
+
+		copied := make(map[string]string, len(aliases))
+		for alias, modelRef := range aliases {
+			copied[alias] = modelRef
+		}
+		cfg.modelAliases = copied
+	}
+}
+
+func WithSessionTitleTemplate(template string) Option {
+	return func(cfg *clientConfig) {
+		cfg.sessionTitleTpl = template
+	}
+}
+
+func WithExtraHeaders(headers map[string]interface{}) Option {
+	return func(cfg *clientConfig) {
+		if headers == nil {
+			cfg.extraHeaders = nil
+			return
+		}
+
+		copied := make(map[string]interface{}, len(headers))
+		for key, value := range headers {
+			copied[key] = value
+		}
+		cfg.extraHeaders = copied
+	}
+}
 
 type ModelRef struct {
 	ProviderID string
@@ -25,26 +118,43 @@ type PromptResult struct {
 }
 
 type Client struct {
-	client         *opsdk.Client
-	cfg            *config.Config
-	defaultModel   ModelRef
-	providerLoaded bool
+	client          *opsdk.Client
+	directory       string
+	promptTimeout   time.Duration
+	modelAliases    map[string]string
+	sessionTitleTpl string
+	defaultModel    ModelRef
+	providerLoaded  bool
 }
 
-func NewClient(cfg *config.Config) (*Client, error) {
-	options := []option.RequestOption{
-		option.WithBaseURL(cfg.Opencode.BaseURL),
+func NewClient(opts ...Option) (*Client, error) {
+	cfg := clientConfig{
+		passwordHeader: "Authorization",
+		passwordScheme: "Bearer",
+		directory:      ".",
+		promptTimeout:  5 * time.Minute,
 	}
 
-	if cfg.Opencode.Password != "" {
-		value := cfg.Opencode.Password
-		if cfg.Opencode.PasswordScheme != "" {
-			value = fmt.Sprintf("%s %s", cfg.Opencode.PasswordScheme, cfg.Opencode.Password)
+	for _, applyOption := range opts {
+		if applyOption == nil {
+			continue
 		}
-		options = append(options, option.WithHeader(cfg.Opencode.PasswordHeader, value))
+		applyOption(&cfg)
 	}
 
-	for key, value := range cfg.Opencode.ExtraHeaders {
+	options := []option.RequestOption{
+		option.WithBaseURL(cfg.baseURL),
+	}
+
+	if cfg.password != "" {
+		value := cfg.password
+		if cfg.passwordScheme != "" {
+			value = fmt.Sprintf("%s %s", cfg.passwordScheme, cfg.password)
+		}
+		options = append(options, option.WithHeader(cfg.passwordHeader, value))
+	}
+
+	for key, value := range cfg.extraHeaders {
 		valueString := fmt.Sprint(value)
 		if valueString == "" {
 			continue
@@ -55,11 +165,14 @@ func NewClient(cfg *config.Config) (*Client, error) {
 	client := opsdk.NewClient(options...)
 
 	return &Client{
-		client: client,
-		cfg:    cfg,
+		client:          client,
+		directory:       cfg.directory,
+		promptTimeout:   cfg.promptTimeout,
+		modelAliases:    cfg.modelAliases,
+		sessionTitleTpl: cfg.sessionTitleTpl,
 		defaultModel: ModelRef{
-			ProviderID: cfg.Opencode.DefaultProvider,
-			ModelID:    cfg.Opencode.DefaultModel,
+			ProviderID: cfg.defaultProvider,
+			ModelID:    cfg.defaultModel,
 		},
 	}, nil
 }
@@ -71,7 +184,7 @@ func (c *Client) CreateSession(ctx context.Context, title string) (*opsdk.Sessio
 
 	return c.client.Session.New(ctx, opsdk.SessionNewParams{
 		Title:     opsdk.F(title),
-		Directory: opsdk.F(c.cfg.Opencode.Directory),
+		Directory: opsdk.F(c.directory),
 	})
 }
 
@@ -88,7 +201,7 @@ func (c *Client) Prompt(ctx context.Context, opencodeSessionID string, message s
 		return nil, err
 	}
 
-	promptCtx, cancel := context.WithTimeout(ctx, c.cfg.Opencode.PromptTimeout)
+	promptCtx, cancel := context.WithTimeout(ctx, c.promptTimeout)
 	defer cancel()
 
 	parts := []opsdk.SessionPromptParamsPartUnion{
@@ -100,7 +213,7 @@ func (c *Client) Prompt(ctx context.Context, opencodeSessionID string, message s
 
 	params := opsdk.SessionPromptParams{
 		Parts:     opsdk.F(parts),
-		Directory: opsdk.F(c.cfg.Opencode.Directory),
+		Directory: opsdk.F(c.directory),
 	}
 
 	if modelRef.ProviderID != "" && modelRef.ModelID != "" {
@@ -129,13 +242,13 @@ func (c *Client) GetSession(ctx context.Context, opencodeSessionID string) (*ops
 	}
 
 	return c.client.Session.Get(ctx, opencodeSessionID, opsdk.SessionGetParams{
-		Directory: opsdk.F(c.cfg.Opencode.Directory),
+		Directory: opsdk.F(c.directory),
 	})
 }
 
 func (c *Client) ListSessions(ctx context.Context) ([]opsdk.Session, error) {
 	resp, err := c.client.Session.List(ctx, opsdk.SessionListParams{
-		Directory: opsdk.F(c.cfg.Opencode.Directory),
+		Directory: opsdk.F(c.directory),
 	})
 	if err != nil {
 		return nil, err
@@ -162,7 +275,7 @@ func (c *Client) resolveModel(ctx context.Context, token string) (ModelRef, erro
 		return c.defaultModel, nil
 	}
 
-	if alias, ok := c.cfg.Opencode.ModelAliases[token]; ok {
+	if alias, ok := c.modelAliases[token]; ok {
 		parsed, err := parseModelRef(alias)
 		if err != nil {
 			return ModelRef{}, fmt.Errorf("invalid model alias %q: %w", token, err)
@@ -238,7 +351,7 @@ func extractReply(parts []opsdk.Part) string {
 }
 
 func (c *Client) NewSessionTitle(chatSessionID string) string {
-	title := c.cfg.Opencode.SessionTitleTpl
+	title := c.sessionTitleTpl
 	if title == "" {
 		title = "chat-session-{session_id}"
 	}
