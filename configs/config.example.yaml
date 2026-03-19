@@ -1,3 +1,25 @@
+log:
+  handlers:
+    default: "default"
+  providers:
+    default:
+      - format: "console"
+        level: "info"
+        verbosity: 3
+        attrs: {}
+        output:
+          stdout:
+            enable: true
+          stderr:
+            enable: false
+          file:
+            enable: false
+            path: "/var/log/opencode-connect/opencode-connect.log"
+            maxSize: "10mb"
+            maxAge: "7d"
+            maxBackups: 10
+            compress: true
+
 plugins:
   chatapi:
     enabled: true
@@ -25,8 +47,3 @@ opencode:
     sonnet: "anthropic/claude-sonnet-4-20250514"
   extra_headers: {}
 
-log:
-  level: "info"
-  format: "console"
-  color: true
-  verbosity: 1
