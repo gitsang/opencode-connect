@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/gitsang/opencode-connect/internal/plugin"
-	"github.com/gitsang/opencode-connect/internal/session"
 )
 
 func TestBuildPluginsSupportsMultipleInstancesOfSameType(t *testing.T) {
@@ -54,7 +53,6 @@ func TestBuildPluginsRejectsMultiplePluginTypesPerInstance(t *testing.T) {
 
 func testInfras() plugin.Infrastructure {
 	return plugin.Infrastructure{
-		Logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
-		SessionStore: session.NewMemoryStore(),
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 }

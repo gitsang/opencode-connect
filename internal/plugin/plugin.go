@@ -5,7 +5,6 @@ import (
 	"log/slog"
 
 	"github.com/gitsang/opencode-connect/internal/connect"
-	"github.com/gitsang/opencode-connect/internal/session"
 )
 
 type HandleFunc func(ctx context.Context, req *connect.Message) (*connect.Message, error)
@@ -17,8 +16,7 @@ type Plugin interface {
 }
 
 type Infrastructure struct {
-	Logger       *slog.Logger
-	SessionStore session.Store
+	Logger *slog.Logger
 }
 
 type Factory func(name string, configRaw any, infra Infrastructure) (Plugin, error)

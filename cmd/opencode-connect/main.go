@@ -81,8 +81,7 @@ func Run(cmd *cobra.Command, _ []string) error {
 	connector := connect.New(opencodeClient, sessionStore)
 
 	infra := plugin.Infrastructure{
-		Logger:       logger,
-		SessionStore: sessionStore,
+		Logger: logger,
 	}
 
 	plugins, err := buildPlugins(c.Plugins, infra)
