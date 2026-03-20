@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/gitsang/configer"
@@ -90,7 +91,7 @@ func Run(cmd *cobra.Command, _ []string) error {
 
 	connector := connect.New(opencodeClient)
 
-	plugins, err := plugin.BuildEnabledPlugins(plugin.Dependencies{
+	deps := plugin.Dependencies{
 		Logger:         logger,
 		OpencodeClient: opencodeClient,
 		SessionStore:   sessionStore,
@@ -98,20 +99,72 @@ func Run(cmd *cobra.Command, _ []string) error {
 		ChatAPI: plugin.ChatAPIConfig{
 			Listen: c.Plugins.ChatAPI.Listen,
 		},
-	})
-	if err != nil {
-		return err
+	}
+
+	plugins := make([]plugin.Plugin, 0, 1)
+	if deps.EnableChatAPI {
+		registration, ok := plugin.GetRegistration("chatapi")
+		if !ok {
+			return fmt.Errorf("plugin chatapi is not registered")
+		}
+
+		currentPlugin, err := registration.Build(deps)
+		if err != nil {
+			return fmt.Errorf("build chatapi plugin: %w", err)
+		}
+		if currentPlugin == nil {
+			return fmt.Errorf("build chatapi plugin: factory returned nil plugin")
+		}
+		plugins = append(plugins, currentPlugin)
+	}
+
+	if len(plugins) == 0 {
+		return fmt.Errorf("no enabled plugins configured")
 	}
 
 	runCtx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	if err := plugin.Run(runCtx, plugins, connector.Handle); err != nil {
-		return err
+	errCh := make(chan error, len(plugins))
+	var waitGroup sync.WaitGroup
+
+	for _, currentPlugin := range plugins {
+		waitGroup.Add(1)
+		go func(current plugin.Plugin) {
+			defer waitGroup.Done()
+			if serveErr := current.Serve(runCtx, connector.Handle); serveErr != nil {
+				errCh <- fmt.Errorf("%s plugin failed: %w", current.Name(), serveErr)
+				cancel()
+			}
+		}(currentPlugin)
 	}
 
-	slog.Info("all plugins stopped")
-	return nil
+	done := make(chan struct{})
+	go func() {
+		waitGroup.Wait()
+		close(done)
+	}()
+
+	select {
+	case runErr := <-errCh:
+		<-done
+		return runErr
+	case <-runCtx.Done():
+		<-done
+		select {
+		case runErr := <-errCh:
+			return runErr
+		default:
+			return nil
+		}
+	case <-done:
+		select {
+		case runErr := <-errCh:
+			return runErr
+		default:
+			return nil
+		}
+	}
 }
 
 func main() {
