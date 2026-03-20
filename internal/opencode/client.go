@@ -2,12 +2,37 @@ package opencode
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"strings"
 	"time"
 
 	ocsdk "github.com/sst/opencode-sdk-go"
+	"github.com/sst/opencode-sdk-go/option"
 )
+
+type Option func(*Options)
+
+type Options struct {
+	Username string
+	Password string
+	Timeout  time.Duration
+}
+
+func WithAuthentication(username, password string) Option {
+	return func(target *Options) {
+		target.Username = username
+		target.Password = password
+	}
+}
+
+func WithTimeout(timeout time.Duration) Option {
+	return func(target *Options) {
+		if timeout > 0 {
+			target.Timeout = timeout
+		}
+	}
+}
 
 type PromptResult struct {
 	Reply             string
@@ -19,10 +44,35 @@ type Client struct {
 	timeout time.Duration
 }
 
-func NewClient(sdkClient *ocsdk.Client) *Client {
+func NewClient(baseURL string, options ...Option) *Client {
+	resolved := Options{
+		Timeout: 10 * time.Minute,
+	}
+
+	for _, apply := range options {
+		if apply == nil {
+			continue
+		}
+		apply(&resolved)
+	}
+
+	timeout := resolved.Timeout
+	if timeout <= 0 {
+		timeout = 10 * time.Minute
+	}
+
+	sdkOptions := []option.RequestOption{option.WithBaseURL(baseURL)}
+	if resolved.Username != "" || resolved.Password != "" {
+		credential := fmt.Sprintf("%s:%s", resolved.Username, resolved.Password)
+		authValue := "Basic " + base64.StdEncoding.EncodeToString([]byte(credential))
+		sdkOptions = append(sdkOptions, option.WithHeader("Authorization", authValue))
+	}
+
+	sdkClient := ocsdk.NewClient(sdkOptions...)
+
 	return &Client{
 		client:  sdkClient,
-		timeout: 10 * time.Minute,
+		timeout: timeout,
 	}
 }
 
@@ -109,4 +159,3 @@ func extractReply(parts []ocsdk.Part) string {
 
 	return strings.TrimSpace(builder.String())
 }
-

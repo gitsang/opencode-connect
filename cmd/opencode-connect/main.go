@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"os"
@@ -17,8 +16,6 @@ import (
 	_ "github.com/gitsang/opencode-connect/internal/plugin/chatapi"
 	"github.com/gitsang/opencode-connect/internal/session"
 	"github.com/spf13/cobra"
-	ocsdk "github.com/sst/opencode-sdk-go"
-	"github.com/sst/opencode-sdk-go/option"
 )
 
 var rootCmd = &cobra.Command{
@@ -75,17 +72,10 @@ func Run(cmd *cobra.Command, _ []string) error {
 		slog.String("pid", fmt.Sprintf("%d", os.Getpid())),
 	)
 
-	sdkOpts := []option.RequestOption{
-		option.WithBaseURL(c.Opencode.BaseURL),
-	}
-	if c.Opencode.Username != "" || c.Opencode.Password != "" {
-		creds := fmt.Sprintf("%s:%s", c.Opencode.Username, c.Opencode.Password)
-		authValue := "Basic " + base64.StdEncoding.EncodeToString([]byte(creds))
-		sdkOpts = append(sdkOpts, option.WithHeader("Authorization", authValue))
-	}
-	sdkClient := ocsdk.NewClient(sdkOpts...)
-
-	opencodeClient := opencode.NewClient(sdkClient)
+	opencodeClient := opencode.NewClient(
+		c.Opencode.BaseURL,
+		opencode.WithAuthentication(c.Opencode.Username, c.Opencode.Password),
+	)
 
 	sessionStore := session.NewMemoryStore()
 
