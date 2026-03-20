@@ -72,13 +72,12 @@ func Run(cmd *cobra.Command, _ []string) error {
 		slog.String("pid", fmt.Sprintf("%d", os.Getpid())),
 	)
 
+	// Dependency Injection
 	opencodeClient := opencode.NewClient(
 		c.Opencode.BaseURL,
 		opencode.WithAuthentication(c.Opencode.Username, c.Opencode.Password),
 	)
-
 	sessionStore := session.NewMemoryStore()
-
 	connector := connect.New(opencodeClient)
 
 	infras := map[string]any{
