@@ -17,9 +17,6 @@ func Register(registration Registration) {
 	if registration.Build == nil {
 		panic(fmt.Sprintf("plugin %s build function is required", registration.Key))
 	}
-	if registration.Enabled == nil {
-		panic(fmt.Sprintf("plugin %s enabled function is required", registration.Key))
-	}
 
 	registrationMu.Lock()
 	defer registrationMu.Unlock()

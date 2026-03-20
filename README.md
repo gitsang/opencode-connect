@@ -8,7 +8,7 @@ This repository now includes a plugin-oriented `opencode-connect` runtime.
 ### Features
 
 - Configurable opencode server `base_url` and password header
-- Plugin-based integration entry (`plugins.chatapi`)
+- Plugin-based integration entry (`plugins.<instance>.<type>`)
 - `opencode-connect` core owns directives/commands parsing and prompt invocation
 - Plugin owns chat transport adaptation and chat-session/opencode-session binding
 - ChatAPI plugin provides a `POST /chat` synchronous endpoint via `Serve(handle)`
@@ -60,13 +60,18 @@ Environment variables are supported by `configer` with prefix `OPENCODE_CONNECT_
 
 - `OPENCODE_CONNECT_OPENCODE_BASE_URL`
 - `OPENCODE_CONNECT_OPENCODE_PASSWORD`
-- `OPENCODE_CONNECT_PLUGINS_CHATAPI_LISTEN`
+
+Plugin instances are now map-based, so plugin configuration is best kept in YAML.
 
 ### Plugin config example
 
 ```yaml
 plugins:
-  chatapi:
-    enabled: true
-    listen: ":8192"
+  openai-chat:
+    chatapi:
+      listen: ":8192"
+
+  webui-chat:
+    chatapi:
+      listen: ":8193"
 ```

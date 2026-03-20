@@ -15,36 +15,63 @@ import (
 	"github.com/gitsang/opencode-connect/internal/opencode"
 	coreplugin "github.com/gitsang/opencode-connect/internal/plugin"
 	"github.com/gitsang/opencode-connect/internal/session"
+	"gopkg.in/yaml.v3"
 )
 
+type Config struct {
+	Listen string `yaml:"listen"`
+}
+
 type Plugin struct {
+	name           string
 	logger         *slog.Logger
-	cfg            coreplugin.ChatAPIConfig
+	cfg            Config
 	opencodeClient *opencode.Client
 	sessionStore   session.Store
 	resolveMu      sync.Mutex
 }
 
 func init() {
-	coreplugin.Register(coreplugin.Registration{
-		Key:     "chatapi",
-		Enabled: func(deps coreplugin.Dependencies) bool { return deps.EnableChatAPI },
-		Build: func(deps coreplugin.Dependencies) (coreplugin.Plugin, error) {
-			if deps.OpencodeClient == nil {
-				return nil, fmt.Errorf("chatapi dependencies.opencodeClient is required")
-			}
-			if deps.SessionStore == nil {
-				return nil, fmt.Errorf("chatapi dependencies.sessionStore is required")
-			}
+	constructor := func(name string, configRaw any, infras map[string]any) (coreplugin.Plugin, error) {
+		cfg := defaultConfig()
+		configBytes, err := yaml.Marshal(configRaw)
+		if err != nil {
+			return nil, err
+		}
+		if err := yaml.Unmarshal(configBytes, &cfg); err != nil {
+			return nil, err
+		}
 
-			return New(deps.Logger, deps.OpencodeClient, deps.SessionStore, deps.ChatAPI), nil
-		},
+		logger, ok := infras[coreplugin.InfraLogger].(*slog.Logger)
+		if !ok || logger == nil {
+			return nil, fmt.Errorf("chatapi infra %q not found", coreplugin.InfraLogger)
+		}
+		opencodeClient, ok := infras[coreplugin.InfraOpencodeClient].(*opencode.Client)
+		if !ok || opencodeClient == nil {
+			return nil, fmt.Errorf("chatapi infra %q not found", coreplugin.InfraOpencodeClient)
+		}
+		sessionStore, ok := infras[coreplugin.InfraSessionStore].(session.Store)
+		if !ok || sessionStore == nil {
+			return nil, fmt.Errorf("chatapi infra %q not found", coreplugin.InfraSessionStore)
+		}
+
+		return New(name, logger, opencodeClient, sessionStore, cfg), nil
+	}
+
+	coreplugin.Register(coreplugin.Registration{
+		Key:   "chatapi",
+		Build: constructor,
 	})
 }
 
-func New(logger *slog.Logger, opencodeClient *opencode.Client, sessionStore session.Store, cfg coreplugin.ChatAPIConfig) *Plugin {
+func defaultConfig() Config {
+	return Config{Listen: ":8192"}
+}
+
+func New(name string, logger *slog.Logger, opencodeClient *opencode.Client, sessionStore session.Store, cfg Config) *Plugin {
 	return &Plugin{
-		logger:         logger,
+		name:           name,
+		logger:         logger.With("plugin_name", name, "plugin_type", "chatapi"),
 		cfg:            cfg,
 		opencodeClient: opencodeClient,
 		sessionStore:   sessionStore,
@@ -52,7 +79,7 @@ func New(logger *slog.Logger, opencodeClient *opencode.Client, sessionStore sess
 }
 
 func (p *Plugin) Name() string {
-	return "chatapi"
+	return p.name
 }
 
 func (p *Plugin) Serve(ctx context.Context, handle coreplugin.HandleFunc) error {

@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"sync"
+	"sort"
 	"syscall"
 
 	"github.com/gitsang/configer"
@@ -81,80 +81,64 @@ func Run(cmd *cobra.Command, _ []string) error {
 
 	connector := connect.New(opencodeClient)
 
-	deps := plugin.Dependencies{
-		Logger:         logger,
-		OpencodeClient: opencodeClient,
-		SessionStore:   sessionStore,
-		EnableChatAPI:  c.Plugins.ChatAPI.Enabled,
-		ChatAPI: plugin.ChatAPIConfig{
-			Listen: c.Plugins.ChatAPI.Listen,
-		},
+	infras := map[string]any{
+		plugin.InfraLogger:         logger,
+		plugin.InfraOpencodeClient: opencodeClient,
+		plugin.InfraSessionStore:   sessionStore,
 	}
 
-	plugins := make([]plugin.Plugin, 0, 1)
-	if deps.EnableChatAPI {
-		registration, ok := plugin.GetRegistration("chatapi")
-		if !ok {
-			return fmt.Errorf("plugin chatapi is not registered")
-		}
-
-		currentPlugin, err := registration.Build(deps)
-		if err != nil {
-			return fmt.Errorf("build chatapi plugin: %w", err)
-		}
-		if currentPlugin == nil {
-			return fmt.Errorf("build chatapi plugin: factory returned nil plugin")
-		}
-		plugins = append(plugins, currentPlugin)
-	}
-
-	if len(plugins) == 0 {
-		return fmt.Errorf("no enabled plugins configured")
+	plugins, err := buildPlugins(c.Plugins, infras)
+	if err != nil {
+		return err
 	}
 
 	runCtx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	errCh := make(chan error, len(plugins))
-	var waitGroup sync.WaitGroup
+	return plugin.Run(runCtx, plugins, connector.Handle)
+}
 
-	for _, currentPlugin := range plugins {
-		waitGroup.Add(1)
-		go func(current plugin.Plugin) {
-			defer waitGroup.Done()
-			if serveErr := current.Serve(runCtx, connector.Handle); serveErr != nil {
-				errCh <- fmt.Errorf("%s plugin failed: %w", current.Name(), serveErr)
-				cancel()
+func buildPlugins(configMap map[string]any, infras map[string]any) ([]plugin.Plugin, error) {
+	instanceNames := make([]string, 0, len(configMap))
+	for instanceName := range configMap {
+		instanceNames = append(instanceNames, instanceName)
+	}
+	sort.Strings(instanceNames)
+
+	plugins := make([]plugin.Plugin, 0, len(instanceNames))
+	for _, instanceName := range instanceNames {
+		instanceConfigRaw := configMap[instanceName]
+		instanceConfigMap, ok := instanceConfigRaw.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("plugin %s config must be a map", instanceName)
+		}
+		if len(instanceConfigMap) != 1 {
+			return nil, fmt.Errorf("plugin %s config must define exactly one plugin type", instanceName)
+		}
+
+		for instanceType, typeConfigRaw := range instanceConfigMap {
+			if typeConfigRaw == nil {
+				return nil, fmt.Errorf("plugin %s config is nil", instanceName)
 			}
-		}(currentPlugin)
-	}
 
-	done := make(chan struct{})
-	go func() {
-		waitGroup.Wait()
-		close(done)
-	}()
+			registration, ok := plugin.GetRegistration(instanceType)
+			if !ok {
+				return nil, fmt.Errorf("unsupported plugin type %q for %q", instanceType, instanceName)
+			}
 
-	select {
-	case runErr := <-errCh:
-		<-done
-		return runErr
-	case <-runCtx.Done():
-		<-done
-		select {
-		case runErr := <-errCh:
-			return runErr
-		default:
-			return nil
-		}
-	case <-done:
-		select {
-		case runErr := <-errCh:
-			return runErr
-		default:
-			return nil
+			currentPlugin, err := registration.Build(instanceName, typeConfigRaw, infras)
+			if err != nil {
+				return nil, fmt.Errorf("build plugin %s (%s): %w", instanceName, instanceType, err)
+			}
+			if currentPlugin == nil {
+				return nil, fmt.Errorf("build plugin %s (%s): factory returned nil plugin", instanceName, instanceType)
+			}
+
+			plugins = append(plugins, currentPlugin)
 		}
 	}
+
+	return plugins, nil
 }
 
 func main() {

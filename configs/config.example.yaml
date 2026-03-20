@@ -20,9 +20,9 @@ log:
             compress: true
 
 plugins:
-  chatapi:
-    enabled: true
-    listen: ":8192"
+  openai-chat:
+    chatapi:
+      listen: ":8192"
 
 opencode:
   baseurl: "http://127.0.0.1:4096"
