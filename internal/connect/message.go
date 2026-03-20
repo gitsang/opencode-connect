@@ -7,8 +7,6 @@ type Message struct {
 	Command           string `json:"command,omitempty"`
 	Reply             string `json:"reply,omitempty"`
 	OpencodeSessionID string `json:"opencode_session_id,omitempty"`
-	Provider          string `json:"provider,omitempty"`
-	Model             string `json:"model,omitempty"`
 }
 
 type Error struct {

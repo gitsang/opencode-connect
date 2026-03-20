@@ -59,7 +59,7 @@ func (c *OpencodeConnect) Handle(ctx context.Context, req *Message) (*Message, e
 		return nil, NewError(http.StatusBadRequest, "opencode_session_id is required")
 	}
 
-	result, err := c.opencodeClient.Prompt(ctx, targetOpencodeSessionID, parsed.Body, parsed.ModelCommand)
+	result, err := c.opencodeClient.Prompt(ctx, targetOpencodeSessionID, parsed.Body)
 	if err != nil {
 		return nil, NewError(http.StatusBadGateway, err.Error())
 	}
@@ -68,8 +68,6 @@ func (c *OpencodeConnect) Handle(ctx context.Context, req *Message) (*Message, e
 		SessionID:         req.SessionID,
 		Reply:             result.Reply,
 		OpencodeSessionID: result.OpencodeSessionID,
-		Provider:          result.ProviderID,
-		Model:             result.ModelID,
 	}, nil
 }
 
