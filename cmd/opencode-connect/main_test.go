@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/gitsang/opencode-connect/internal/opencode"
 	"github.com/gitsang/opencode-connect/internal/plugin"
 	"github.com/gitsang/opencode-connect/internal/session"
 )
@@ -53,10 +52,9 @@ func TestBuildPluginsRejectsMultiplePluginTypesPerInstance(t *testing.T) {
 	}
 }
 
-func testInfras() map[string]any {
-	return map[string]any{
-		plugin.InfraLogger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
-		plugin.InfraOpencodeClient: &opencode.Client{},
-		plugin.InfraSessionStore:   session.NewMemoryStore(),
+func testInfras() plugin.Infrastructure {
+	return plugin.Infrastructure{
+		Logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		SessionStore: session.NewMemoryStore(),
 	}
 }

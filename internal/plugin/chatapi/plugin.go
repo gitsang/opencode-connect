@@ -7,14 +7,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/gitsang/opencode-connect/internal/connect"
-	"github.com/gitsang/opencode-connect/internal/opencode"
 	coreplugin "github.com/gitsang/opencode-connect/internal/plugin"
-	"github.com/gitsang/opencode-connect/internal/session"
 	"gopkg.in/yaml.v3"
 )
 
@@ -23,16 +19,13 @@ type Config struct {
 }
 
 type Plugin struct {
-	name           string
-	logger         *slog.Logger
-	cfg            Config
-	opencodeClient *opencode.Client
-	sessionStore   session.Store
-	resolveMu      sync.Mutex
+	name   string
+	logger *slog.Logger
+	cfg    Config
 }
 
 func init() {
-	constructor := func(name string, configRaw any, infras map[string]any) (coreplugin.Plugin, error) {
+	constructor := func(name string, configRaw any, infra coreplugin.Infrastructure) (coreplugin.Plugin, error) {
 		cfg := defaultConfig()
 		configBytes, err := yaml.Marshal(configRaw)
 		if err != nil {
@@ -42,20 +35,11 @@ func init() {
 			return nil, err
 		}
 
-		logger, ok := infras[coreplugin.InfraLogger].(*slog.Logger)
-		if !ok || logger == nil {
-			return nil, fmt.Errorf("chatapi infra %q not found", coreplugin.InfraLogger)
-		}
-		opencodeClient, ok := infras[coreplugin.InfraOpencodeClient].(*opencode.Client)
-		if !ok || opencodeClient == nil {
-			return nil, fmt.Errorf("chatapi infra %q not found", coreplugin.InfraOpencodeClient)
-		}
-		sessionStore, ok := infras[coreplugin.InfraSessionStore].(session.Store)
-		if !ok || sessionStore == nil {
-			return nil, fmt.Errorf("chatapi infra %q not found", coreplugin.InfraSessionStore)
+		if infra.Logger == nil {
+			return nil, fmt.Errorf("chatapi infrastructure logger is required")
 		}
 
-		return New(name, logger, opencodeClient, sessionStore, cfg), nil
+		return New(name, infra.Logger, cfg), nil
 	}
 
 	coreplugin.Register(coreplugin.Registration{
@@ -68,13 +52,11 @@ func defaultConfig() Config {
 	return Config{Listen: ":8192"}
 }
 
-func New(name string, logger *slog.Logger, opencodeClient *opencode.Client, sessionStore session.Store, cfg Config) *Plugin {
+func New(name string, logger *slog.Logger, cfg Config) *Plugin {
 	return &Plugin{
-		name:           name,
-		logger:         logger.With("plugin_name", name, "plugin_type", "chatapi"),
-		cfg:            cfg,
-		opencodeClient: opencodeClient,
-		sessionStore:   sessionStore,
+		name:   name,
+		logger: logger.With("plugin_name", name, "plugin_type", "chatapi"),
+		cfg:    cfg,
 	}
 }
 
@@ -141,13 +123,6 @@ func (p *Plugin) newHTTPHandler(handle coreplugin.HandleFunc) http.Handler {
 			return
 		}
 
-		targetOpencodeSessionID, err := p.resolveOpencodeSessionID(r.Context(), req.SessionID, req.Message)
-		if err != nil {
-			writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
-			return
-		}
-		req.OpencodeSessionID = targetOpencodeSessionID
-
 		resp, err := handle(r.Context(), &req)
 		if err != nil {
 			status := http.StatusInternalServerError
@@ -158,54 +133,10 @@ func (p *Plugin) newHTTPHandler(handle coreplugin.HandleFunc) http.Handler {
 			writeJSON(w, status, map[string]any{"error": err.Error()})
 			return
 		}
-
-		if strings.TrimSpace(resp.OpencodeSessionID) != "" {
-			p.sessionStore.Set(req.SessionID, resp.OpencodeSessionID)
-		}
-
 		writeJSON(w, http.StatusOK, resp)
 	})
 
 	return mux
-}
-
-func (p *Plugin) resolveOpencodeSessionID(ctx context.Context, chatSessionID string, message string) (string, error) {
-	if strings.TrimSpace(chatSessionID) == "" {
-		return "", fmt.Errorf("session_id is required")
-	}
-
-	parsed, err := connect.ParseMessage(message)
-	if err != nil {
-		return "", nil
-	}
-
-	if parsed.SlashCommand != "" {
-		return "", nil
-	}
-
-	if strings.TrimSpace(parsed.SessionCommand) != "" {
-		target := strings.TrimSpace(parsed.SessionCommand)
-		if _, getErr := p.opencodeClient.GetSession(ctx, target); getErr != nil {
-			return "", fmt.Errorf("session not found: %s", target)
-		}
-		p.sessionStore.Set(chatSessionID, target)
-		return target, nil
-	}
-
-	p.resolveMu.Lock()
-	defer p.resolveMu.Unlock()
-
-	if opencodeSessionID, ok := p.sessionStore.Get(chatSessionID); ok {
-		return opencodeSessionID, nil
-	}
-
-	created, err := p.opencodeClient.CreateSession(ctx, chatSessionID)
-	if err != nil {
-		return "", err
-	}
-
-	p.sessionStore.Set(chatSessionID, created.ID)
-	return created.ID, nil
 }
 
 func writeJSON(w http.ResponseWriter, statusCode int, payload any) {

@@ -78,15 +78,14 @@ func Run(cmd *cobra.Command, _ []string) error {
 		opencode.WithAuthentication(c.Opencode.Username, c.Opencode.Password),
 	)
 	sessionStore := session.NewMemoryStore()
-	connector := connect.New(opencodeClient)
+	connector := connect.New(opencodeClient, sessionStore)
 
-	infras := map[string]any{
-		plugin.InfraLogger:         logger,
-		plugin.InfraOpencodeClient: opencodeClient,
-		plugin.InfraSessionStore:   sessionStore,
+	infra := plugin.Infrastructure{
+		Logger:       logger,
+		SessionStore: sessionStore,
 	}
 
-	plugins, err := buildPlugins(c.Plugins, infras)
+	plugins, err := buildPlugins(c.Plugins, infra)
 	if err != nil {
 		return err
 	}
@@ -97,7 +96,7 @@ func Run(cmd *cobra.Command, _ []string) error {
 	return plugin.Run(runCtx, plugins, connector.Handle)
 }
 
-func buildPlugins(configMap map[string]any, infras map[string]any) ([]plugin.Plugin, error) {
+func buildPlugins(configMap map[string]any, infra plugin.Infrastructure) ([]plugin.Plugin, error) {
 	instanceNames := make([]string, 0, len(configMap))
 	for instanceName := range configMap {
 		instanceNames = append(instanceNames, instanceName)
@@ -125,7 +124,7 @@ func buildPlugins(configMap map[string]any, infras map[string]any) ([]plugin.Plu
 				return nil, fmt.Errorf("unsupported plugin type %q for %q", instanceType, instanceName)
 			}
 
-			currentPlugin, err := registration.Build(instanceName, typeConfigRaw, infras)
+			currentPlugin, err := registration.Build(instanceName, typeConfigRaw, infra)
 			if err != nil {
 				return nil, fmt.Errorf("build plugin %s (%s): %w", instanceName, instanceType, err)
 			}

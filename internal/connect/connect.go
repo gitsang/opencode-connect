@@ -6,17 +6,29 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/gitsang/opencode-connect/internal/opencode"
+	"github.com/gitsang/opencode-connect/internal/session"
 )
 
-type OpencodeConnect struct {
-	opencodeClient *opencode.Client
+type sessionClient interface {
+	ListSessions(ctx context.Context) ([]opencode.Session, error)
+	GetSession(ctx context.Context, sessionID string) (*opencode.Session, error)
+	CreateSession(ctx context.Context, sessionID string) (*opencode.Session, error)
+	Prompt(ctx context.Context, sessionID string, message string) (*opencode.PromptResult, error)
 }
 
-func New(opencodeClient *opencode.Client) *OpencodeConnect {
+type OpencodeConnect struct {
+	opencodeClient sessionClient
+	sessionStore   session.Store
+	resolveMu      sync.Mutex
+}
+
+func New(opencodeClient sessionClient, sessionStore session.Store) *OpencodeConnect {
 	return &OpencodeConnect{
 		opencodeClient: opencodeClient,
+		sessionStore:   sessionStore,
 	}
 }
 
@@ -27,6 +39,12 @@ func (c *OpencodeConnect) Handle(ctx context.Context, req *Message) (*Message, e
 
 	if strings.TrimSpace(req.SessionID) == "" {
 		return nil, NewError(http.StatusBadRequest, "session_id is required")
+	}
+	if c.opencodeClient == nil {
+		return nil, NewError(http.StatusInternalServerError, "opencode client is required")
+	}
+	if c.sessionStore == nil {
+		return nil, NewError(http.StatusInternalServerError, "session store is required")
 	}
 
 	parsed, err := ParseMessage(req.Message)
@@ -53,15 +71,23 @@ func (c *OpencodeConnect) Handle(ctx context.Context, req *Message) (*Message, e
 		if _, err := c.opencodeClient.GetSession(ctx, targetOpencodeSessionID); err != nil {
 			return nil, NewError(http.StatusBadGateway, fmt.Sprintf("session not found: %s", targetOpencodeSessionID))
 		}
+		c.sessionStore.Set(req.SessionID, targetOpencodeSessionID)
 	}
 
 	if targetOpencodeSessionID == "" {
-		return nil, NewError(http.StatusBadRequest, "opencode_session_id is required")
+		resolvedSessionID, err := c.resolveOpencodeSessionID(ctx, req.SessionID)
+		if err != nil {
+			return nil, NewError(http.StatusBadGateway, err.Error())
+		}
+		targetOpencodeSessionID = resolvedSessionID
 	}
 
 	result, err := c.opencodeClient.Prompt(ctx, targetOpencodeSessionID, parsed.Body)
 	if err != nil {
 		return nil, NewError(http.StatusBadGateway, err.Error())
+	}
+	if strings.TrimSpace(result.OpencodeSessionID) != "" {
+		c.sessionStore.Set(req.SessionID, result.OpencodeSessionID)
 	}
 
 	return &Message{
@@ -69,6 +95,27 @@ func (c *OpencodeConnect) Handle(ctx context.Context, req *Message) (*Message, e
 		Reply:             result.Reply,
 		OpencodeSessionID: result.OpencodeSessionID,
 	}, nil
+}
+
+func (c *OpencodeConnect) resolveOpencodeSessionID(ctx context.Context, chatSessionID string) (string, error) {
+	if opencodeSessionID, ok := c.sessionStore.Get(chatSessionID); ok {
+		return opencodeSessionID, nil
+	}
+
+	c.resolveMu.Lock()
+	defer c.resolveMu.Unlock()
+
+	if opencodeSessionID, ok := c.sessionStore.Get(chatSessionID); ok {
+		return opencodeSessionID, nil
+	}
+
+	created, err := c.opencodeClient.CreateSession(ctx, chatSessionID)
+	if err != nil {
+		return "", err
+	}
+
+	c.sessionStore.Set(chatSessionID, created.ID)
+	return created.ID, nil
 }
 
 func (c *OpencodeConnect) listSessions(ctx context.Context) (string, error) {

@@ -11,6 +11,8 @@ import (
 	"github.com/sst/opencode-sdk-go/option"
 )
 
+type Session = ocsdk.Session
+
 type Option func(*Options)
 
 type Options struct {

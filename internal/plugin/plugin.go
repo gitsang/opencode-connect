@@ -2,8 +2,10 @@ package plugin
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/gitsang/opencode-connect/internal/connect"
+	"github.com/gitsang/opencode-connect/internal/session"
 )
 
 type HandleFunc func(ctx context.Context, req *connect.Message) (*connect.Message, error)
@@ -14,13 +16,12 @@ type Plugin interface {
 	Send(ctx context.Context, req *connect.Message) (*connect.Message, error)
 }
 
-const (
-	InfraLogger         = "logger"
-	InfraOpencodeClient = "opencode_client"
-	InfraSessionStore   = "session_store"
-)
+type Infrastructure struct {
+	Logger       *slog.Logger
+	SessionStore session.Store
+}
 
-type Factory func(name string, configRaw any, infras map[string]any) (Plugin, error)
+type Factory func(name string, configRaw any, infra Infrastructure) (Plugin, error)
 
 type Registration struct {
 	Key   string
