@@ -43,8 +43,8 @@ func init() {
 	}
 
 	coreplugin.Register(coreplugin.PluginFactory{
-		Key:   "chatapi",
-		Build: constructor,
+		Name:      "chatapi",
+		Construct: constructor,
 	})
 }
 

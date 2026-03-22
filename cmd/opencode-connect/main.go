@@ -123,7 +123,7 @@ func buildPlugins(configMap map[string]any, infra plugin.Infrastructure) ([]plug
 				return nil, fmt.Errorf("unsupported plugin type %q for %q", instanceType, instanceName)
 			}
 
-			currentPlugin, err := registration.Build(instanceName, typeConfigRaw, infra)
+			currentPlugin, err := registration.Construct(instanceName, typeConfigRaw, infra)
 			if err != nil {
 				return nil, fmt.Errorf("build plugin %s (%s): %w", instanceName, instanceType, err)
 			}

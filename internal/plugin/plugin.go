@@ -2,7 +2,9 @@ package plugin
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"sync"
 
 	"github.com/gitsang/opencode-connect/internal/connect"
 )
@@ -22,6 +24,33 @@ type Infrastructure struct {
 type Construct func(name string, configRaw any, infra Infrastructure) (Plugin, error)
 
 type PluginFactory struct {
-	Key   string
-	Build Construct
+	Name      string
+	Construct Construct
+}
+
+var (
+	registrationMu   sync.RWMutex
+	pluginFactoryMap = map[string]PluginFactory{}
+)
+
+func Register(registration PluginFactory) {
+	if registration.Name == "" {
+		panic("plugin registration key is required")
+	}
+	if registration.Construct == nil {
+		panic(fmt.Sprintf("plugin %s build function is required", registration.Name))
+	}
+
+	registrationMu.Lock()
+	defer registrationMu.Unlock()
+
+	pluginFactoryMap[registration.Name] = registration
+}
+
+func GetRegistration(key string) (PluginFactory, bool) {
+	registrationMu.RLock()
+	defer registrationMu.RUnlock()
+
+	registration, ok := pluginFactoryMap[key]
+	return registration, ok
 }
