@@ -19,9 +19,9 @@ type Infrastructure struct {
 	Logger *slog.Logger
 }
 
-type Factory func(name string, configRaw any, infra Infrastructure) (Plugin, error)
+type Construct func(name string, configRaw any, infra Infrastructure) (Plugin, error)
 
-type Registration struct {
+type PluginFactory struct {
 	Key   string
-	Build Factory
+	Build Construct
 }

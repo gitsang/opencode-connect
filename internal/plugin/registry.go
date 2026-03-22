@@ -7,10 +7,10 @@ import (
 
 var (
 	registrationMu  sync.RWMutex
-	registrationMap = map[string]Registration{}
+	pluginFactoryMap = map[string]PluginFactory{}
 )
 
-func Register(registration Registration) {
+func Register(registration PluginFactory) {
 	if registration.Key == "" {
 		panic("plugin registration key is required")
 	}
@@ -20,13 +20,13 @@ func Register(registration Registration) {
 
 	registrationMu.Lock()
 	defer registrationMu.Unlock()
-	registrationMap[registration.Key] = registration
+	pluginFactoryMap[registration.Key] = registration
 }
 
-func GetRegistration(key string) (Registration, bool) {
+func GetRegistration(key string) (PluginFactory, bool) {
 	registrationMu.RLock()
 	defer registrationMu.RUnlock()
 
-	registration, ok := registrationMap[key]
+	registration, ok := pluginFactoryMap[key]
 	return registration, ok
 }

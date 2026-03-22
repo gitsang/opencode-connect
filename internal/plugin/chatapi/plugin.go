@@ -42,7 +42,7 @@ func init() {
 		return New(name, infra.Logger, cfg), nil
 	}
 
-	coreplugin.Register(coreplugin.Registration{
+	coreplugin.Register(coreplugin.PluginFactory{
 		Key:   "chatapi",
 		Build: constructor,
 	})
