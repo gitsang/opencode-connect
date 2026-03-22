@@ -80,17 +80,15 @@ func Run(cmd *cobra.Command, _ []string) error {
 	sessionStore := session.NewMemoryStore()
 	connector := connect.New(opencodeClient, sessionStore)
 
-	infra := plugin.Infrastructure{
-		Logger: logger,
-	}
+	runCtx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
 
-	plugins, err := buildPlugins(c.Plugins, infra)
+	plugins, err := buildPlugins(c.Plugins, plugin.Infrastructure{
+		Logger: logger,
+	})
 	if err != nil {
 		return err
 	}
-
-	runCtx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
 
 	return plugin.Run(runCtx, plugins, connector.Handle)
 }
