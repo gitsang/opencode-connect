@@ -77,7 +77,6 @@ func (p *Plugin) Serve(ctx context.Context, handle coreplugin.HandleFunc) error 
 
 	errCh := make(chan error, 1)
 	go func() {
-		p.logger.Info("chatapi plugin started", "listen", serverConfig.Listen)
 		errCh <- server.ListenAndServe()
 	}()
 
@@ -90,7 +89,6 @@ func (p *Plugin) Serve(ctx context.Context, handle coreplugin.HandleFunc) error 
 
 	err := <-errCh
 	if err == nil || err == http.ErrServerClosed {
-		p.logger.Info("chatapi plugin stopped")
 		return nil
 	}
 

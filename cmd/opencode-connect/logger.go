@@ -31,9 +31,9 @@ type LogConfig struct {
 		File struct {
 			Enable     bool   `json:"enable" yaml:"enable" default:"false" usage:"enable file log"`
 			Path       string `json:"path" yaml:"path" default:"/var/log/yauth/yauth.log" usage:"log file path"`
-			MaxSize    string `json:"maxSize" yaml:"maxSize" default:"10mb" usage:"log file max size using SI(decimal) standard (K|mb|Gb...)"`
-			MaxAge     string `json:"maxAge" yaml:"maxAge" default:"7d" usage:"log file max age (d|h|m|s)"`
-			MaxBackups int    `json:"maxBackups" yaml:"maxBackups" default:"10" usage:"log file max backups"`
+			MaxSize    string `json:"max_size" yaml:"max_size" default:"10mb" usage:"log file max size using SI(decimal) standard (K|mb|Gb...)"`
+			MaxAge     string `json:"max_age" yaml:"max_age" default:"7d" usage:"log file max age (d|h|m|s)"`
+			MaxBackups int    `json:"max_backups" yaml:"max_backups" default:"10" usage:"log file max backups"`
 			Compress   bool   `json:"compress" yaml:"compress" default:"true" usage:"enable log file compress"`
 		} `json:"file" yaml:"file"`
 	} `json:"output" yaml:"output"`

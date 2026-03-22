@@ -16,6 +16,7 @@ import (
 	_ "github.com/gitsang/opencode-connect/internal/plugin/chatapi"
 	"github.com/gitsang/opencode-connect/internal/session"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 var rootCmd = &cobra.Command{
@@ -25,7 +26,7 @@ var rootCmd = &cobra.Command{
 }
 
 var rootFlags = struct {
-	ConfigFile string
+	ConfigFile string `json:"config_file" yaml:"config_file"`
 }{}
 
 var cfger *configer.Configer
@@ -83,57 +84,68 @@ func Run(cmd *cobra.Command, _ []string) error {
 	runCtx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	plugins, err := buildPlugins(c.Plugins, plugin.Infrastructure{
-		Logger: logger,
-	})
-	if err != nil {
-		return err
+	if len(c.Plugins) == 0 {
+		return fmt.Errorf("no enabled plugins configured")
 	}
 
-	return plugin.Run(runCtx, plugins, connector.Handle)
-}
+	pluginInfra := plugin.Infrastructure{Logger: logger}
+	group, groupCtx := errgroup.WithContext(runCtx)
 
-func buildPlugins(configMap map[string]any, infra plugin.Infrastructure) ([]plugin.Plugin, error) {
-	instanceNames := make([]string, 0, len(configMap))
-	for instanceName := range configMap {
+	instanceNames := make([]string, 0, len(c.Plugins))
+	for instanceName := range c.Plugins {
 		instanceNames = append(instanceNames, instanceName)
 	}
 	sort.Strings(instanceNames)
 
-	plugins := make([]plugin.Plugin, 0, len(instanceNames))
 	for _, instanceName := range instanceNames {
-		instanceConfigRaw := configMap[instanceName]
+		instanceConfigRaw := c.Plugins[instanceName]
 		instanceConfigMap, ok := instanceConfigRaw.(map[string]any)
 		if !ok {
-			return nil, fmt.Errorf("plugin %s config must be a map", instanceName)
+			return fmt.Errorf("plugin %s config must be a map", instanceName)
 		}
 		if len(instanceConfigMap) != 1 {
-			return nil, fmt.Errorf("plugin %s config must define exactly one plugin type", instanceName)
+			return fmt.Errorf("plugin %s config must define exactly one plugin type", instanceName)
 		}
 
-		for instanceType, typeConfigRaw := range instanceConfigMap {
-			if typeConfigRaw == nil {
-				return nil, fmt.Errorf("plugin %s config is nil", instanceName)
+		for pluginType, pluginConfigRaw := range instanceConfigMap {
+			if pluginConfigRaw == nil {
+				return fmt.Errorf("plugin %s config is nil", instanceName)
 			}
 
-			registration, ok := plugin.GetPluginFactory(instanceType)
+			pluginFactory, ok := plugin.GetPluginFactory(pluginType)
 			if !ok {
-				return nil, fmt.Errorf("unsupported plugin type %q for %q", instanceType, instanceName)
+				return fmt.Errorf("unsupported plugin type %q for %q", pluginType, instanceName)
 			}
 
-			currentPlugin, err := registration.Construct(instanceName, typeConfigRaw, infra)
+			plugin, err := pluginFactory.Construct(instanceName, pluginConfigRaw, pluginInfra)
 			if err != nil {
-				return nil, fmt.Errorf("build plugin %s (%s): %w", instanceName, instanceType, err)
+				return fmt.Errorf("build plugin %s (%s): %w", instanceName, pluginType, err)
 			}
-			if currentPlugin == nil {
-				return nil, fmt.Errorf("build plugin %s (%s): factory returned nil plugin", instanceName, instanceType)
+			if plugin == nil {
+				return fmt.Errorf("build plugin %s (%s): factory returned nil plugin", instanceName, pluginType)
 			}
 
-			plugins = append(plugins, currentPlugin)
+			currentPlugin := plugin
+			group.Go(func() error {
+				logger := logger.With(
+					slog.String("plugin_name", instanceName),
+					slog.String("plugin_type", pluginType),
+					slog.Any("plugin_config", pluginConfigRaw),
+				)
+				defer func() {
+					logger.Debug("plugin stopped")
+				}()
+				logger.Debug("starting plugin")
+
+				if err := currentPlugin.Serve(groupCtx, connector.Handle); err != nil {
+					return fmt.Errorf("%s plugin failed: %w", currentPlugin.Name(), err)
+				}
+				return nil
+			})
 		}
 	}
 
-	return plugins, nil
+	return group.Wait()
 }
 
 func main() {
