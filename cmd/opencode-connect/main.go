@@ -118,7 +118,7 @@ func buildPlugins(configMap map[string]any, infra plugin.Infrastructure) ([]plug
 				return nil, fmt.Errorf("plugin %s config is nil", instanceName)
 			}
 
-			registration, ok := plugin.GetRegistration(instanceType)
+			registration, ok := plugin.GetPluginFactory(instanceType)
 			if !ok {
 				return nil, fmt.Errorf("unsupported plugin type %q for %q", instanceType, instanceName)
 			}

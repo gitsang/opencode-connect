@@ -47,7 +47,7 @@ func Register(registration PluginFactory) {
 	pluginFactoryMap[registration.Name] = registration
 }
 
-func GetRegistration(key string) (PluginFactory, bool) {
+func GetPluginFactory(key string) (PluginFactory, bool) {
 	registrationMu.RLock()
 	defer registrationMu.RUnlock()
 
